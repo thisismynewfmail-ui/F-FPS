@@ -145,9 +145,67 @@ The heads-up display must be **thematic** (retro, gritty, survival-horror feel) 
 - Include indoor spaces (abandoned houses, warehouses) for close-quarters combat variety
 - Use the provided textures consistently across all surfaces — walls use wall.png, ground uses grass.png or floor.png depending on location
 - Add environmental details: broken cars, debris piles, abandoned vehicles, overgrown vegetation
+This is an FPS game. The overall game world is a town space with progressively unlocking areas based on current wave (e.g wave at count 500 kills unlocks a new part of the city map). Retain this while ensuring the correct and intensive reworking of the game world itself. Add terrain variation, hills, slopes, etc and all where appropriate. Design with not only realism but gameplay as well, ensuring proper and sensible progression, thought out world, etc.
+PROGRESSION SYSTEM
+------------------
+The map is divided into distinct zones that unlock sequentially based on cumulative kill count milestones. This has already been implemented, but needs to be kept in mind while reworking the game. Each zone represents a new area of the town, expanding outward from an initial starting point. The first zone should be small enough to feel claustrophobic and manageable; subsequent zones grow in scale and complexity as the player proves their capability.
 
-### Map Generation Approach
-Use procedural generation seeded with a fixed value so the world is consistent between playthroughs but different from other seeds. Define biomes (urban ruins, forest, open field) and populate each with appropriate geometry and textures.
+Design at least five unlock thresholds. Use 500 kills for the second zone as your baseline reference point, then determine proportional scaling for additional zones (e.g., 1200, 2500, 4500, 7000). The spacing between unlocks should feel earned but not punishingly distant. Each new zone must introduce meaningful environmental variety so the player perceives genuine expansion rather than incremental reskinning.
+
+The unlock mechanic itself should be communicated to the player through environmental storytelling: a blocked road that clears, a door that opens, a bridge that lowers. Avoid UI popups for unlocks when possible; let the world tell the story of progression.
+ 
+TERRAIN AND TOPOGRAPHY
+----------------------
+The entire map must incorporate meaningful elevation changes. Flat terrain kills FPS gameplay because it removes verticality from movement and combat. Design hills, slopes, embankments, and depressions throughout every zone. These should not be cosmetic; they must create tactical depth. A hill provides a sightline advantage for the player but also makes them an obvious target. A depression or ditch offers cover but limits visibility of approaching enemies.
+
+Use height variation to naturally channel enemy movement along predictable paths while giving players multiple engagement options. Steep slopes should slow movement speed slightly so they function as terrain hazards rather than free vertical traversal. Ensure that every zone has at least one area with significant elevation change (10+ meters) to support vertical combat encounters.
+
+BUILDINGS AND STRUCTURES
+------------------------
+Building placement must follow organic urban planning logic, not grid-based symmetry or random scatter. Residential areas cluster together with streets between them. Commercial zones concentrate near the town center or main thoroughfares. Industrial structures sit at the map edges where they belong. Each building type should appear in quantities that match its real-world rarity: one library for an entire town, two churches maximum, a handful of gas stations, dozens of houses.
+
+Every building must have functional geometry. Doors need to be placed on walls that face streets or logical entry points, not randomly on any side. Windows should align with interior room layouts. Roofs must match the building footprint and slope directionally based on climate logic (snow-shedding angles where appropriate). Interior spaces should be navigable and contain meaningful loot, cover positions, or enemy spawn opportunities.
+
+Texture integration is mandatory across all building surfaces. Walls, roofs, doors, windows, foundations, and trim elements each need distinct texture sets that read clearly at the retro sprite resolution. Do not reuse a single wall texture across every building; create variation through color shifts, material differences (brick versus wood versus concrete), and weathering patterns. Buildings near the town center should appear more maintained than those on the outskirts where decay is visible.
+
+CITY ZONE DESIGN
+-----------------
+One major portion of the map is dedicated to a dense urban city area. This zone requires the most detailed design work because it serves as both the visual centerpiece and the primary combat arena for mid-to-late game waves. The city must feel lived-in, abandoned, and slightly wrong in ways that reinforce the cosmic horror theme without being overtly supernatural.
+
+Design the city with proper urban infrastructure: main roads wide enough for vehicle movement (even if no vehicles exist), side streets creating a navigable grid or organic street pattern, intersections with clear sightlines, alleys between buildings for flanking routes, and public spaces like plazas or parks that break up the density. The layout should reward exploration without punishing navigation; players must be able to orient themselves using landmarks.
+
+Include functional city elements: traffic lights (non-functional but visually present), street signs, bus stops, crosswalks, fire hydrants, manhole covers, and utility poles. These details cost little in sprite resources but massively increase environmental believability.
+
+NATURE AND VEGETATION
+---------------------
+Nature must be woven throughout the urban environment rather than confined to a separate wilderness zone. Trees grow through cracked pavement at intersections. Vines climb building facades on the north-facing walls where they would naturally accumulate moisture. Grass and weeds push through sidewalk fissures in dense patches along abandoned lots. Bushes cluster around fence lines and property boundaries.
+
+All vegetation must be animated. Wind sway for trees, subtle leaf movement for bushes, grass bending with directional force. Animation should be visible but not distracting; the goal is ambient life, not a nature documentary. Ensure all natural elements use textures consistent with the retro PNG sprite aesthetic so they blend seamlessly with buildings and terrain rather than appearing as modern assets pasted into an old-style game.
+
+Place vegetation strategically for gameplay: dense tree clusters create cover opportunities and ambush points, overgrown lots signal unexplored territory to curious players, and vine-covered buildings hint at interior spaces worth investigating.
+
+THEMATIC COHESION AND AESTHETIC
+---------------------------------
+The entire world must maintain a consistent retro PNG sprite visual style throughout all generated textures, sprites, and environmental elements. This is not optional; every asset must read as part of the same pixel-art universe. When generating new textures to fill gaps in the existing sprite set, match the resolution, color palette depth, and rendering technique of the original assets exactly.
+
+The atmospheric tone is subtle cosmic horror: unsettling, wrong, and unknown rather than overtly gory or jump-scare driven. Achieve this through environmental details that feel slightly off. Shadows that do not align with light sources. Buildings whose geometry subtly contradicts their exterior appearance. Sounds heard from directions that make no spatial sense. Objects placed in locations where they should not be. These elements should whisper rather than scream, creating persistent unease without breaking gameplay flow.
+
+EASTER EGGS AND SECRETS
+-----------------------
+Populate the world with hidden areas, secret rooms, and environmental surprises. Some secrets should reward exploration (hidden loot caches behind false walls, alternate routes through collapsed buildings). Others should be purely atmospheric (a room where nothing is wrong except one detail that does not belong, a hallway that loops back on itself when viewed from above but not from ground level).
+
+Design at least ten distinct secret locations across the full map. Vary their discovery methods: some require finding hidden keys, others need specific kill count thresholds to trigger environmental changes, and some are purely observational rewards for players who look closely enough at the world around them.
+
+IMPLEMENTATION PRIORITIES
+-------------------------
+1. Map layout and zone progression system first; everything else depends on this foundation.
+2. Terrain elevation and topography second; verticality shapes all subsequent design decisions.
+3. Building placement and geometry third; structures define the navigable space.
+4. Texture integration fourth; visual consistency across all assets.
+5. Nature elements fifth; vegetation layers over existing infrastructure.
+6. City zone detail work sixth; this is the highest-effort section requiring iteration.
+7. Animation for natural elements seventh; polish layer on top of static assets.
+8. Easter eggs and secrets last; these are discovery rewards that depend on a complete world to hide within.
 
 ---
 
