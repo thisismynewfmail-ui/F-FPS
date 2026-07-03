@@ -80,7 +80,6 @@ The game must use **2003 Half-Life Style style textures** applied to all surface
 
 **Required texture files (provide or generate these):**
 These are only some of the textures for the game. For content that doesn't have a texture yet (e.g trees, outer walls, etc) simply create the geometry and leave them untextured with color. Enusre it is built to allow for future implimentation of textures. Ensure correct application of textures and texture sheets, including correctly applying sprites to their appropraite orientation and scaling.
-- `wall_inside_office.png` — brick or concrete wall texture, tileable
 - `npc_spritesheet_peacefull.png` - a frieldly passive NPC near spawn.
 - `npc_spritesheet_zombie_basic.png` - a standard zombie
 
