@@ -20,11 +20,11 @@ export class AudioManager {
     this.listener = { x: 0, z: 0, yaw: 0 };
 
     const on = events.on.bind(events);
-    on('weapon:fire', ({ weapon }) => this.gunshot(weapon.config.sound));
+    on('weapon:fire', ({ weapon, sound }) => this.gunshot(sound ?? weapon.config.sound));
     on('melee:swing', ({ hit }) => { this.whoosh(); if (hit) this.thud(); });
-    on('weapon:reload:start', ({ weapon }) => this.reload(weapon.config.reloadTime));
-    on('weapon:empty', () => this.click());
-    on('weapon:switch', () => this.click(1400, 0.04));
+    on('weapon:reload:start', ({ weapon }) => this.reload(weapon.config.reloadTime, weapon.config.id));
+    on('weapon:empty', () => this.emptyClick());
+    on('weapon:switch', ({ weapon }) => this.equipSound(weapon.config.id));
     on('footstep', ({ surface, sprinting }) => this.footstep(surface, sprinting));
     on('pickup', ({ type }) => (type === 'health' ? this.healthChime() : type === 'key' ? this.keyChime() : this.ammoChime()));
     on('player:damage', () => this.hurt());
@@ -104,27 +104,74 @@ export class AudioManager {
 
   /* ---------------- weapons ---------------- */
 
+  // A "punch": a low body tone with a fast downward pitch sweep. This is what
+  // gives every gunshot its weight and thump before the noise crack.
+  _punch(freq, freqEnd, dur, gain, when = 0, pan = 0, type = 'sine') {
+    this._tone(type, freq, dur, gain, when, pan, freqEnd);
+  }
+  // A brass-mechanism tick — the steampunk action cycling after a shot.
+  _brassTick(when = 0, gain = 0.09, pan = 0) {
+    this._noise(0.02, 'highpass', 3200, 1, gain, when, pan);
+    this._tone('square', 2600, 0.02, gain * 0.5, when + 0.005, pan, 1800);
+  }
+
+  /**
+   * Per-weapon gunshots. Each is layered (body punch + noise crack + brassy
+   * action tick + tail) and level-matched so no weapon dominates the mix.
+   */
   gunshot(kind) {
     if (!this.ctx) return;
     switch (kind) {
-      case 'pistol':
-        this._noise(0.09, 'lowpass', 2400, 1, 0.5);
-        this._tone('square', 220, 0.05, 0.22, 0, 0, 90);
+      case 'pistol': // sharp, snappy, brass-cased
+        this._punch(300, 70, 0.09, 0.42, 0, 0, 'triangle');
+        this._noise(0.07, 'lowpass', 2600, 1, 0.5);
+        this._noise(0.05, 'highpass', 3600, 0.8, 0.16);
+        this._brassTick(0.05, 0.08);
         break;
-      case 'shotgun':
-        this._noise(0.28, 'lowpass', 900, 0.8, 0.85);
-        this._tone('sawtooth', 110, 0.16, 0.4, 0, 0, 45);
+      case 'pistolAuto': // hair-trigger: lighter and higher so rapid fire stays clean
+        this._punch(260, 90, 0.05, 0.3, 0, 0, 'triangle');
+        this._noise(0.045, 'bandpass', 3000, 1.2, 0.34);
+        this._brassTick(0.03, 0.05);
         break;
-      case 'rifle':
-        this._noise(0.06, 'bandpass', 1900, 1.2, 0.5);
-        this._tone('square', 190, 0.04, 0.18, 0, 0, 110);
+      case 'shotgun': // deep gritty boom with a low tail
+        this._punch(150, 34, 0.22, 0.6, 0, 0, 'sine');
+        this._punch(90, 30, 0.3, 0.4, 0, 0, 'sine');
+        this._noise(0.26, 'lowpass', 950, 0.8, 0.62);
+        this._noise(0.45, 'lowpass', 500, 0.5, 0.18, 0.08); // smoke tail
+        this._brassTick(0.09, 0.07);
         break;
-      case 'sniper':
-        this._noise(0.14, 'lowpass', 3200, 1, 0.9);
-        this._tone('sawtooth', 150, 0.2, 0.4, 0, 0, 40);
-        this._noise(0.5, 'lowpass', 700, 0.6, 0.18, 0.12); // rolling echo
+      case 'shotgunDouble': // both barrels: two stacked booms, biggest impact
+        this._punch(150, 32, 0.26, 0.7, 0, 0, 'sine');
+        this._punch(120, 28, 0.3, 0.55, 0.02, 0, 'sine');
+        this._punch(70, 26, 0.36, 0.42, 0, 0, 'sine');
+        this._noise(0.32, 'lowpass', 850, 0.8, 0.7);
+        this._noise(0.6, 'lowpass', 420, 0.5, 0.22, 0.1);
         break;
-      case 'bat': break; // silent weapon
+      case 'rifle': // mechanical crack with a brassy metallic ring
+        this._punch(220, 80, 0.05, 0.34, 0, 0, 'square');
+        this._noise(0.05, 'bandpass', 2100, 1.4, 0.42);
+        this._tone('square', 1500, 0.03, 0.1, 0.01, 0.1, 2600); // action ring
+        this._brassTick(0.035, 0.06, -0.1);
+        break;
+      case 'rifleBurst': // burst rounds: tighter and a touch brighter
+        this._punch(240, 90, 0.045, 0.36, 0, 0, 'square');
+        this._noise(0.045, 'bandpass', 2400, 1.5, 0.44);
+        this._brassTick(0.03, 0.06);
+        break;
+      case 'sniper': // heavy crack, deep body, long rolling echo
+        this._punch(170, 40, 0.2, 0.62, 0, 0, 'sawtooth');
+        this._punch(80, 30, 0.28, 0.4, 0, 0, 'sine');
+        this._noise(0.13, 'lowpass', 3400, 1, 0.6);
+        this._noise(0.6, 'lowpass', 700, 0.6, 0.2, 0.14);  // valley echo 1
+        this._noise(0.7, 'lowpass', 480, 0.6, 0.12, 0.34); // valley echo 2
+        this._brassTick(0.16, 0.07);
+        break;
+      case 'batCharge': // steam-piston wind-up + iron clank (melee alt)
+        this._noise(0.35, 'highpass', 1800, 0.7, 0.22, 0, 0, 600); // steam hiss
+        this._tone('sine', 70, 0.12, 0.34, 0.28, 0, 40);           // piston slam
+        this._noise(0.08, 'lowpass', 400, 1, 0.4, 0.3);            // clank
+        break;
+      case 'bat': break; // primary swing carried by whoosh()/thud()
     }
   }
 
@@ -132,11 +179,45 @@ export class AudioManager {
   thud() { this._noise(0.1, 'lowpass', 300, 1, 0.55); this._tone('sine', 90, 0.1, 0.4, 0, 0, 50); }
   click(freq = 1800, gain = 0.08) { this._noise(0.025, 'highpass', freq, 1, gain); }
 
-  reload(time) {
+  /** Dry hammer-on-empty-chamber click. */
+  emptyClick() {
+    this._noise(0.02, 'highpass', 2600, 1, 0.12);
+    this._tone('square', 900, 0.02, 0.08, 0.01, 0, 500);
+  }
+
+  /** Holster the old weapon, draw and seat the new one (brass ratchet). */
+  equipSound(id) {
+    this._noise(0.03, 'bandpass', 1000, 2, 0.1, 0);         // leather/holster
+    this._tone('square', 1600, 0.03, 0.07, 0.05, 0, 2400);  // draw
+    this._brassTick(0.1, 0.09);
+    if (id === 'shotgun' || id === 'sniper') this._tone('sine', 120, 0.05, 0.14, 0.12, 0, 70); // heavy seat
+  }
+
+  /**
+   * Reload choreography: an immediate release/eject, mid-cycle mechanism,
+   * and a seating "complete" thunk near the end. Shaped per weapon family.
+   */
+  reload(time, id) {
     if (!this.ctx) return;
-    this.click(1300, 0.1);
-    this._noise(0.03, 'bandpass', 900, 2, 0.12, time * 0.45);
-    this._noise(0.04, 'bandpass', 1200, 2, 0.16, time * 0.92);
+    if (id === 'shotgun') {
+      // break the action, thumb shells, snap shut
+      this._tone('square', 700, 0.05, 0.12, 0, 0, 300);       // break open
+      this._noise(0.03, 'bandpass', 1100, 2, 0.12, time * 0.35);
+      this._noise(0.03, 'bandpass', 1100, 2, 0.12, time * 0.55);
+      this._tone('sine', 130, 0.06, 0.2, time * 0.92, 0, 70); // snap shut
+      this._brassTick(time * 0.95, 0.1);
+    } else if (id === 'sniper') {
+      this._tone('square', 800, 0.05, 0.12, 0, 0, 400);       // bolt back
+      this._noise(0.05, 'bandpass', 900, 2, 0.14, time * 0.45); // clip press
+      this._tone('square', 1200, 0.04, 0.12, time * 0.85, 0, 700); // bolt forward
+      this._brassTick(time * 0.9, 0.09);
+    } else {
+      // magazine weapons: release, insert, chamber
+      this.click(1300, 0.1);
+      this._noise(0.03, 'bandpass', 900, 2, 0.12, time * 0.45);
+      this._tone('square', 1100, 0.03, 0.14, time * 0.88, 0, 600);
+      this._brassTick(time * 0.94, 0.08);
+    }
   }
 
   /* ---------------- movement / pickups ---------------- */

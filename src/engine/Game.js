@@ -13,7 +13,7 @@ import { WaveSystem } from '../systems/WaveSystem.js';
 import { SpawnSystem } from '../systems/SpawnSystem.js';
 import { GameState } from '../systems/GameState.js';
 import { Effects } from '../rendering/Effects.js';
-import { ViewModel } from '../rendering/ViewModel.js';
+import { WeaponView } from '../rendering/WeaponView.js';
 import { HUD } from '../rendering/HUD.js';
 import { AudioManager } from '../audio/AudioManager.js';
 
@@ -52,7 +52,7 @@ export class Game {
     this.npc = new NPC(this.events, this.world, this.texLib.get('npcPeaceful'));
     this.renderer.scene.add(this.npc.mesh);
     this.effects = new Effects(this.events, this.renderer.scene, this.texLib, this.player);
-    this.viewModel = new ViewModel(this.events, this.hudRoot);
+    this.viewModel = new WeaponView(this.events, this.renderer, this.texLib);
     this.audio = new AudioManager(this.events);
     this.hud = new HUD(this.events, this.hudRoot, {
       onStart: () => this.startPlaying(),

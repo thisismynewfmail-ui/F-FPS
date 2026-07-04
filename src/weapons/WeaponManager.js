@@ -24,6 +24,7 @@ export class WeaponManager {
     this.index = 0;
     this.switchTimer = 0;
     this.scoped = false;
+    this._burstLeft = 0; // rifle alt-fire burst counter
     this.zombies = null; // wired by Game
 
     events.on('pickup', ({ type, amount }) => {
@@ -42,6 +43,7 @@ export class WeaponManager {
     if (i === this.index || i < 0 || i >= this.weapons.length) return;
     this.current.cancelReload();
     this.setScope(false);
+    this._burstLeft = 0;
     this.index = i;
     this.switchTimer = 0.3;
     this.events.emit('weapon:switch', { weapon: this.current });
@@ -61,12 +63,14 @@ export class WeaponManager {
     for (const w of this.weapons) w.update(dt);
     if (this.switchTimer > 0) this.switchTimer -= dt;
 
-    // switching
+    // switching (number keys + wheel). Poke the weapon menu into view on any
+    // slot input, even when the selection doesn't change.
     for (let i = 0; i < 5; i++) {
-      if (input.wasPressed('Digit' + (i + 1))) this.switchTo(i);
+      if (input.wasPressed('Digit' + (i + 1))) { this.switchTo(i); this.events.emit('weapon:menu:poke', { index: i }); }
     }
     if (input.wheelDelta !== 0) {
       this.switchTo((this.index + (input.wheelDelta > 0 ? 1 : -1) + this.weapons.length) % this.weapons.length);
+      this.events.emit('weapon:menu:poke', { index: this.index });
     }
 
     // reload
@@ -74,41 +78,80 @@ export class WeaponManager {
       this.events.emit('weapon:reload:start', { weapon: this.current });
     }
 
-    // scope (hold right mouse)
-    this.setScope(input.isMouseDown(2) && this.current.config.zoom !== null && this.switchTimer <= 0);
+    const cfg = this.current.config;
+    const scopeWeapon = cfg.zoom !== null && cfg.zoom !== undefined;
 
-    // fire
-    const wantFire = this.current.config.auto ? input.isMouseDown(0) : input.wasClicked(0);
-    if (wantFire && this.switchTimer <= 0) this.tryFire();
+    // right mouse = telescopic scope on the sniper, secondary fire otherwise
+    this.setScope(scopeWeapon && input.isMouseDown(2) && this.switchTimer <= 0);
+
+    if (this.switchTimer > 0) { this._burstLeft = 0; return; }
+
+    // primary fire (LMB)
+    const wantPrimary = cfg.auto ? input.isMouseDown(0) : input.wasClicked(0);
+    if (wantPrimary) { this.tryFire(false); this._burstLeft = 0; }
+
+    // secondary fire (RMB) — mode set per weapon
+    if (!scopeWeapon && cfg.alt) {
+      const mode = cfg.alt.mode;
+      if (mode === 'auto') {
+        if (input.isMouseDown(2)) this.tryFire(true);
+      } else if (mode === 'burst') {
+        if (input.wasClicked(2) && this._burstLeft <= 0 && this.current.cooldown <= 0) this._burstLeft = cfg.alt.count;
+      } else if (input.wasClicked(2)) {
+        this.tryFire(true); // double / charge — one action per click
+      }
+    }
+
+    // feed an in-flight burst, tight spacing until the last round
+    if (this._burstLeft > 0 && this.current.cooldown <= 0) {
+      const interval = this._burstLeft > 1 ? (cfg.alt.burstSpacing ?? 0.06) : cfg.alt.fireInterval;
+      if (this.tryFire(true, { interval })) this._burstLeft--;
+      else this._burstLeft = 0;
+    }
   }
 
-  tryFire() {
+  /**
+   * Fire the current weapon. `alt` selects the secondary-fire profile;
+   * `opts.interval` overrides the resulting cooldown (used for burst spacing).
+   * Returns true if a shot actually went off.
+   */
+  tryFire(alt = false, opts = {}) {
     const w = this.current;
-    if (w.reloading || this.switchTimer > 0) return;
-    if (w.cooldown > 0) return;
-    if (!w.isMelee && w.mag <= 0) {
+    if (w.reloading || this.switchTimer > 0 || w.cooldown > 0) return false;
+    const a = alt ? w.config.alt : null;
+    const shells = a?.shells ?? 1;
+    if (!w.isMelee && w.mag < shells) {
       this.events.emit('weapon:empty', { weapon: w });
       if (w.startReload()) this.events.emit('weapon:reload:start', { weapon: w });
-      return;
+      return false;
     }
-    const spread = w.fire(this.scoped);
-    if (w.isMelee) this._swing(w);
-    else this._shoot(w, spread);
-    this.events.emit('weapon:fire', { weapon: w, scoped: this.scoped });
-    if (w.config.noise > 0) {
-      this.events.emit('noise', { pos: this.player.position.clone(), radius: w.config.noise });
-    }
+    const interval = opts.interval ?? a?.fireInterval ?? w.config.fireInterval;
+    const spread = w.fire(this.scoped, { interval, ammo: shells, spread: a?.spread });
+    // effective combat parameters for this shot
+    const eff = {
+      damage: w.config.damage * (a?.damageMul ?? 1),
+      pellets: a?.pellets ?? w.config.pellets ?? 1,
+      pierce: w.config.pierce ?? 1,
+      range: w.config.range,
+      knockback: (w.config.knockback ?? 0) * (a?.knockbackMul ?? 1),
+      arc: (w.config.arc ?? 0) * (a?.arcMul ?? 1),
+    };
+    if (w.isMelee) this._swing(w, eff);
+    else this._shoot(w, spread, eff);
+    const noise = a?.noise ?? w.config.noise;
+    this.events.emit('weapon:fire', { weapon: w, scoped: this.scoped, alt, sound: a?.sound ?? w.config.sound });
+    if (noise > 0) this.events.emit('noise', { pos: this.player.position.clone(), radius: noise });
+    return true;
   }
 
-  _shoot(w, spreadDeg) {
-    const cfg = w.config;
+  _shoot(w, spreadDeg, eff) {
     const origin = this.player.eyePosition();
     const baseDir = this.player.lookDirection();
     let anyHit = false;
 
-    for (let p = 0; p < cfg.pellets; p++) {
+    for (let p = 0; p < eff.pellets; p++) {
       const dir = coneSpread(baseDir, spreadDeg);
-      const hit = this._resolveRay(origin, dir, cfg);
+      const hit = this._resolveRay(origin, dir, eff);
       if (hit) anyHit = true;
     }
     this.events.emit('shot:fired', {});
@@ -117,6 +160,7 @@ export class WeaponManager {
   }
 
   _resolveRay(origin, dir, cfg) {
+    // cfg here is the effective per-shot params (range/pierce/damage/knockback).
     // World geometry distance caps the ray.
     let worldDist = this.world.collision.raycast(origin, dir, cfg.range);
     const terrainDist = this._terrainRay(origin, dir, Math.min(cfg.range, worldDist));
@@ -184,34 +228,34 @@ export class WeaponManager {
     return Infinity;
   }
 
-  _swing(w) {
-    const cfg = w.config;
+  _swing(w, eff) {
     const origin = this.player.position;
     const dir = this.player.lookDirection();
     const yaw = Math.atan2(dir.x, dir.z);
-    const arcRad = (cfg.arc * Math.PI / 180) / 2;
+    const arcRad = (eff.arc * Math.PI / 180) / 2;
     let hitAny = false;
     for (const z of this.zombies) {
       if (z.state === 'dead') continue;
       const dx = z.position.x - origin.x, dz = z.position.z - origin.z;
       const d = Math.hypot(dx, dz);
-      if (d > cfg.range + z.radius) continue;
+      if (d > eff.range + z.radius) continue;
       if (Math.abs(z.position.y - origin.y) > 2) continue;
       let da = Math.atan2(dx, dz) - yaw;
       da = Math.atan2(Math.sin(da), Math.cos(da));
       if (Math.abs(da) > arcRad) continue;
-      z.takeDamage(cfg.damage, { x: dx / (d || 1), z: dz / (d || 1) }, cfg.knockback);
+      z.takeDamage(eff.damage, { x: dx / (d || 1), z: dz / (d || 1) }, eff.knockback);
       hitAny = true;
     }
     this.events.emit('melee:swing', { hit: hitAny });
   }
 
-  /** HUD snapshot for the ammo counter + weapon bar. */
+  /** HUD snapshot for the ammo counter + weapon menu. */
   hudState() {
     return this.weapons.map((w, i) => ({
       id: w.config.id,
       name: w.config.name,
-      icon: w.config.icon,
+      flavor: w.config.flavor,
+      altLabel: w.config.altLabel,
       slot: w.config.slot,
       active: i === this.index,
       mag: w.mag,

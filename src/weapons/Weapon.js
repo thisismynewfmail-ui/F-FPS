@@ -29,12 +29,16 @@ export class Weapon {
     return this.cooldown <= 0 && !this.reloading && (this.isMelee || this.mag > 0);
   }
 
-  /** Consume a shot; returns effective spread in degrees. */
-  fire(scoped = false) {
-    this.cooldown = this.config.fireInterval;
-    if (!this.isMelee) this.mag--;
-    const base = scoped && this.config.spreadScoped !== undefined
-      ? this.config.spreadScoped
+  /**
+   * Consume a shot; returns effective spread in degrees. `opts` lets the
+   * alt-fire paths override the cooldown, ammo drawn per trigger pull, and
+   * base spread (e.g. shotgun both-barrels draws 2 shells).
+   */
+  fire(scoped = false, opts = {}) {
+    this.cooldown = opts.interval ?? this.config.fireInterval;
+    if (!this.isMelee) this.mag -= (opts.ammo ?? 1);
+    const base = opts.spread !== undefined ? opts.spread
+      : scoped && this.config.spreadScoped !== undefined ? this.config.spreadScoped
       : (this.config.spread ?? 0);
     const spread = base + this.bloom;
     this.bloom = Math.min(this.config.bloomMax ?? this.bloom + 10, this.bloom + (this.config.bloomPerShot ?? 0));

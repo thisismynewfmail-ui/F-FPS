@@ -1,4 +1,3 @@
-import { TEXTURES, TEXTURE_DIR } from './TextureConfig.js';
 import { WIN_KILLS } from '../systems/ScoreSystem.js';
 
 /**
@@ -21,6 +20,8 @@ export class HUD {
     this._vignette = 0;
     this._heal = 0;
     this._banner = 0;
+    this._menuTimer = 0;   // seconds of visibility remaining for the weapon menu
+    this._menuShown = false;
     this._build();
     this._wire();
   }
@@ -69,8 +70,11 @@ export class HUD {
     this.ammoEl = this._el('div', 'ammo', br);
     this.reloadEl = this._el('div', 'reload-hint', br);
 
-    // bottom-center: weapon bar
-    this.weaponBar = this._el('div', 'weapon-bar');
+    // top-center: weapon menu (hidden by default; fades in on slot input,
+    // auto-hides after inactivity). Sits just under the kill counter.
+    this.weaponMenu = this._el('div', 'weapon-menu');
+    this._el('div', null, this.weaponMenu, 'wm-title').textContent = 'ARMORY';
+    this.menuSlots = this._el('div', null, this.weaponMenu, 'wm-slots');
     this.slotEls = [];
     // filled on first update
 
@@ -152,6 +156,48 @@ export class HUD {
       this._fillStats(document.getElementById('victory-stats'), stats);
       this.showScreen('victory');
     });
+
+    // weapon menu: number key / scroll reveals it; firing or reloading (a
+    // state-changing action) dismisses it immediately.
+    on('weapon:menu:poke', () => this.showWeaponMenu());
+    on('weapon:switch', () => this.showWeaponMenu());
+    on('weapon:fire', () => this.hideWeaponMenu());
+    on('weapon:reload:start', () => this.hideWeaponMenu());
+  }
+
+  showWeaponMenu() {
+    this._menuTimer = 2.5;
+    if (!this._menuShown) {
+      this._menuShown = true;
+      this.weaponMenu.style.transition = 'opacity 0.15s ease-in-out, transform 0.15s ease-in-out';
+      this.weaponMenu.classList.add('show');
+    }
+  }
+
+  hideWeaponMenu() {
+    this._menuTimer = 0;
+    if (this._menuShown) {
+      this._menuShown = false;
+      this.weaponMenu.style.transition = 'opacity 0.2s ease-in-out, transform 0.2s ease-in-out';
+      this.weaponMenu.classList.remove('show');
+    }
+  }
+
+  /** Small gold line-art glyph so each slot reads at a glance. */
+  _drawGlyph(canvas, id) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#e0b840'; ctx.fillStyle = '#e0b840';
+    ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    const p = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); };
+    switch (id) {
+      case 'pistol': p([[8, 8], [40, 8], [40, 15], [22, 15], [22, 30], [14, 30], [14, 15], [8, 15]]); break;
+      case 'shotgun': ctx.fillRect(6, 10, 44, 4); ctx.fillRect(6, 15, 44, 4); ctx.fillRect(44, 9, 12, 14); break;
+      case 'rifle': ctx.fillRect(8, 11, 40, 7); ctx.fillRect(44, 13, 12, 3); ctx.fillRect(20, 18, 8, 12); ctx.fillRect(10, 18, 6, 8); break;
+      case 'sniper': ctx.fillRect(6, 13, 50, 4); ctx.fillRect(22, 7, 18, 4); ctx.fillRect(50, 12, 8, 6); break;
+      case 'bat': ctx.beginPath(); ctx.moveTo(8, 20); ctx.lineTo(40, 12); ctx.lineTo(56, 12); ctx.lineTo(56, 20); ctx.lineTo(40, 20); ctx.closePath(); ctx.fill(); break;
+      default: ctx.fillRect(10, 12, 40, 8);
+    }
   }
 
   subtitle(text) {
@@ -231,20 +277,33 @@ export class HUD {
     this.pointsEl.textContent = 'SCORE ' + d.points.toLocaleString('en-US');
     this.secretsEl.textContent = 'SECRETS ' + d.secrets.found + '/' + d.secrets.total;
 
-    // weapon bar
+    // weapon menu (built once, then refreshed; visibility handled by timer)
     if (!this.slotEls.length) {
       for (const w of d.weapons) {
-        const slot = this._el('div', null, this.weaponBar, 'slot');
-        slot.innerHTML = `<span class="key">${w.slot}</span><img src="${TEXTURE_DIR + TEXTURES[w.icon]}" alt="">`;
-        const name = this._el('div', null, slot, 'slot-name');
-        name.textContent = w.name;
+        const slot = this._el('div', null, this.menuSlots, 'wm-slot');
+        const cv = document.createElement('canvas'); cv.width = 64; cv.height = 34;
+        cv.className = 'wm-glyph'; this._drawGlyph(cv, w.id);
+        const key = this._el('div', null, slot, 'wm-key'); key.textContent = w.slot;
+        slot.appendChild(cv);
+        this._el('div', null, slot, 'wm-name').textContent = w.flavor || w.name;
+        this._el('div', null, slot, 'wm-ammo');
         this.slotEls.push(slot);
       }
     }
     d.weapons.forEach((w, i) => {
-      this.slotEls[i].classList.toggle('active', w.active);
-      this.slotEls[i].classList.toggle('dry', !w.active && w.mag === 0 && w.reserve === 0 && w.id !== 'bat');
+      const slot = this.slotEls[i];
+      slot.classList.toggle('active', w.active);
+      slot.classList.toggle('dry', w.mag === 0 && w.reserve === 0 && w.id !== 'bat');
+      const ammo = slot.querySelector('.wm-ammo');
+      ammo.textContent = w.mag === Infinity ? 'MELEE'
+        : `${w.mag} / ${w.reserve === Infinity ? '∞' : w.reserve}`;
     });
+
+    // auto-hide after inactivity
+    if (this._menuTimer > 0) {
+      this._menuTimer -= dt;
+      if (this._menuTimer <= 0) this.hideWeaponMenu();
+    }
 
     // prompt
     if (d.prompt) {

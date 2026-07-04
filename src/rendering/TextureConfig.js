@@ -57,19 +57,15 @@ export const TEXTURES = {
   manhole: 'manhole.png',
   shadowDecal: 'shadow_decal.png',
   // effects
-  muzzleFlash: 'muzzle_flash.png',
+  muzzleFlash: 'muzzle_flash.png', // used by the 3D weapon muzzle flash
   blood: 'blood.png',
   smoke: 'smoke.png',
   // pickups
   ammoBox: 'ammo_box.png',
   healthPack: 'health_pack.png',
   key: 'key.png',
-  // first-person weapon sprites (also used as HUD icons)
-  weaponPistol: 'weapon_pistol.png',
-  weaponShotgun: 'weapon_shotgun.png',
-  weaponRifle: 'weapon_rifle.png',
-  weaponSniper: 'weapon_sniper.png',
-  weaponBat: 'weapon_bat.png',
+  // NOTE: the old 2D first-person weapon sprites were removed — weapons are
+  // now real 3D models (src/weapons/WeaponModels.js + WeaponView.js).
 };
 
 export const SPRITES = {

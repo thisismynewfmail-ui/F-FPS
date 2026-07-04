@@ -764,96 +764,11 @@ foliage('bush.png', 64, [[40, 68, 32], [52, 84, 38], [64, 98, 44]], 160, (a) => 
 }
 
 /* ------------------------------------------------------------------ */
-/* Weapon view sprites (side view, pixel art)                          */
+/* (First-person weapon sprites removed.)                              */
 /* ------------------------------------------------------------------ */
-// Drawn on 128x64 canvases, displayed with nearest-neighbour scaling.
-
-const GUN = {
-  dark: [38, 38, 42], mid: [64, 64, 70], light: [96, 96, 104],
-  wood: [104, 72, 42], woodD: [80, 54, 32], amber: [200, 160, 60],
-};
-
-{ // pistol
-  const img = new Img(128, 64, [0, 0, 0, 0]);
-  img.rectC(30, 18, 64, 12, GUN.mid);        // slide
-  img.rectC(30, 18, 64, 3, GUN.light);
-  img.rectC(88, 21, 14, 6, GUN.dark);        // muzzle
-  img.rectC(34, 30, 34, 6, GUN.dark);        // frame
-  img.rectC(36, 34, 16, 22, GUN.dark);       // grip
-  img.rectC(38, 36, 6, 18, GUN.mid);
-  img.rectC(56, 34, 12, 4, GUN.dark);        // trigger guard
-  img.rectC(64, 36, 3, 8, GUN.dark);
-  img.rectC(56, 42, 10, 3, GUN.dark);
-  img.rectC(32, 14, 4, 4, GUN.light);        // rear sight
-  img.rectC(90, 14, 3, 4, GUN.light);        // front sight
-  img.outline([16, 16, 18, 255]);
-  save('weapon_pistol.png', img);
-}
-
-{ // shotgun
-  const img = new Img(128, 64, [0, 0, 0, 0]);
-  img.rectC(6, 26, 26, 16, GUN.wood);        // stock
-  img.rectC(6, 26, 26, 4, [120, 86, 50]);
-  img.rectC(30, 24, 40, 12, GUN.mid);        // receiver
-  img.rectC(66, 22, 56, 7, GUN.dark);        // barrel
-  img.rectC(66, 30, 40, 7, GUN.woodD);       // pump
-  img.rectC(70, 32, 32, 2, GUN.wood);
-  img.rectC(44, 36, 10, 8, GUN.dark);        // trigger
-  img.rectC(118, 20, 4, 4, GUN.light);       // bead
-  img.outline([16, 16, 18, 255]);
-  save('weapon_shotgun.png', img);
-}
-
-{ // assault rifle
-  const img = new Img(128, 64, [0, 0, 0, 0]);
-  img.rectC(4, 24, 22, 12, GUN.dark);        // stock
-  img.rectC(24, 22, 46, 14, GUN.mid);        // receiver
-  img.rectC(24, 22, 46, 3, GUN.light);
-  img.rectC(48, 36, 12, 16, GUN.dark);       // magazine (angled steps)
-  img.rectC(50, 44, 12, 6, GUN.dark);
-  img.rectC(52, 50, 12, 4, GUN.dark);
-  img.rectC(34, 36, 10, 12, GUN.mid);        // grip
-  img.rectC(68, 24, 44, 8, GUN.dark);        // barrel + handguard
-  img.rectC(68, 24, 26, 3, GUN.woodD);
-  img.rectC(110, 26, 12, 4, GUN.mid);        // muzzle
-  img.rectC(40, 16, 4, 6, GUN.light);        // carry sight
-  img.rectC(104, 18, 3, 6, GUN.light);
-  img.outline([16, 16, 18, 255]);
-  save('weapon_rifle.png', img);
-}
-
-{ // sniper rifle
-  const img = new Img(128, 64, [0, 0, 0, 0]);
-  img.rectC(2, 28, 24, 14, GUN.wood);        // stock
-  img.rectC(24, 26, 36, 12, GUN.mid);        // receiver
-  img.rectC(58, 28, 62, 6, GUN.dark);        // long barrel
-  img.rectC(116, 26, 8, 10, GUN.dark);       // muzzle brake
-  img.rectC(34, 14, 30, 8, GUN.dark);        // scope
-  img.disc(36, 18, 5, GUN.dark);
-  img.disc(62, 18, 4, GUN.dark);
-  img.disc(62, 18, 2, [120, 180, 200]);      // lens
-  img.rectC(42, 22, 4, 5, GUN.mid);          // scope mount
-  img.rectC(54, 22, 4, 5, GUN.mid);
-  img.rectC(36, 38, 10, 10, GUN.woodD);      // grip
-  img.rectC(66, 34, 20, 4, GUN.woodD);       // fore-end
-  img.outline([16, 16, 18, 255]);
-  save('weapon_sniper.png', img);
-}
-
-{ // baseball bat (vertical: handle bottom, barrel top)
-  const img = new Img(64, 128, [0, 0, 0, 0]);
-  for (let y = 0; y < 118; y++) {
-    const t = y / 118; // 0=top(fat) 1=bottom(thin)
-    const half = Math.round(9 - t * 5.5);
-    const shade = t < 0.1 ? GUN.woodD : GUN.wood;
-    img.rectC(32 - half, y + 4, half * 2, 1, shade);
-    img.rectC(32 - half, y + 4, 2, 1, [122, 88, 52]); // highlight edge
-  }
-  img.rectC(24, 116, 16, 8, [50, 40, 30]);   // knob
-  for (const y of [40, 44]) img.rectC(24, y, 17, 2, [86, 58, 34]); // tape rings
-  img.outline([20, 16, 12, 255]);
-  save('weapon_bat.png', img);
-}
+// Weapons are now real 3D models generated at runtime from primitives and
+// procedural PBR materials — see src/weapons/WeaponModels.js and
+// src/rendering/WeaponMaterials.js. There is nothing to bake here.
 
 console.log(`Wrote ${files.length} textures to ${OUT_DIR}:`);
 for (const f of files) console.log('  ' + f);
