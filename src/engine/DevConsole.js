@@ -3,10 +3,9 @@
  *
  * While open it owns the keyboard (game input is suppressed) and the game
  * keeps running behind it. Commands run against the live game object;
- * `noclip` grants free flight through all geometry.
- *
- * Deliberately absent: any command that touches the kill counter. The
- * 250,000 win condition has no shortcuts, console included.
+ * `noclip` grants free flight through all geometry. `kill` adds kills through
+ * the real scoring pipeline (so zone unlocks and the win condition behave
+ * exactly as they would in play).
  */
 export class DevConsole {
   constructor(game, root) {
@@ -111,6 +110,9 @@ const COMMANDS = {
     con.print('give            fill every weapon\'s magazine and reserve');
     con.print('tp <x> <z>      teleport to map coordinates (spawn is 0 20)');
     con.print('speed <mult>    movement speed multiplier (0.1 – 10)');
+    con.print('cull <s|off>    remove zombies blind to the player for s seconds');
+    con.print('kill [n]        add n kills through the scoring pipeline (default 1)');
+    con.print('time <0-24>     set the time of day (6=dawn, 12=noon, 0=midnight)');
     con.print('pos             print current position');
     con.print('clear           clear this log');
   },
@@ -157,6 +159,35 @@ const COMMANDS = {
     if (!Number.isFinite(m) || m < 0.1 || m > 10) throw new Error('usage: speed <0.1 – 10>');
     game.player.speedMult = m;
     con.print('speed multiplier: ' + m, 'ok');
+  },
+
+  kill(con, game, args) {
+    const n = args[0] ? Math.floor(Number(args[0])) : 1;
+    if (!Number.isFinite(n) || n < 1) throw new Error('usage: kill [count]');
+    let added = 0;
+    for (let i = 0; i < n && !game.score.victory; i++) { game.score.registerKill('Walker', 1); added++; }
+    con.print(`+${added} kills (total ${game.score.kills.toLocaleString('en-US')})`, 'ok');
+  },
+
+  time(con, game, args) {
+    const h = Number(args[0]);
+    if (!Number.isFinite(h) || h < 0 || h > 24) throw new Error('usage: time <0-24>');
+    // Map clock hours to the sky phase: sunrise 6 → 0, noon 12 → 0.25.
+    game.sky.setPhase((h - 6) / 24);
+    con.print(`time set to ${h}:00 — ${game.sky.isDay ? 'daylight' : 'night'}`, 'ok');
+  },
+
+  cull(con, game, args) {
+    const a = (args[0] || '').toLowerCase();
+    if (a === 'off' || a === '0') {
+      game.spawner.setCull(0);
+      con.print('blind-cull flag OFF — zombies are no longer removed for losing sight of you');
+      return;
+    }
+    const s = args[0] ? Number(args[0]) : 30;
+    if (!Number.isFinite(s) || s <= 0) throw new Error('usage: cull <seconds|off>');
+    game.spawner.setCull(s);
+    con.print(`blind-cull flag ON — zombies with no clear line to you for ${s}s are removed`, 'ok');
   },
 
   pos(con, game) {

@@ -20,6 +20,10 @@ export class SpawnSystem {
     this.waves = waveSystem;
     this.zombies = [];
     this.spawnTimer = 1;
+    // Opt-in "cull a zombie that can't see the player for N seconds" flag.
+    // 0 = off (default). Stamped onto every zombie at spawn; see Game.load
+    // for where it is actively switched on, and the `cull` console command.
+    this.cullBlindSeconds = 0;
 
     // One shared material per type; billboards clone it per zombie but the
     // GPU texture is shared (tinted variants are separate small uploads).
@@ -75,9 +79,20 @@ export class SpawnSystem {
     if (!p) return null;
     const z = new Zombie(ZOMBIE_TYPES[typeName], this.materials[typeName], this.world, this.events);
     z.placeAt(p.x + (Math.random() - 0.5) * 2, p.z + (Math.random() - 0.5) * 2);
+    if (this.cullBlindSeconds > 0) z.flags.cullBlindSeconds = this.cullBlindSeconds;
     this.zombies.push(z);
     this.scene.add(z.mesh);
     return z;
+  }
+
+  /** Toggle the blind-cull flag and (re)stamp it onto every live zombie. */
+  setCull(seconds) {
+    this.cullBlindSeconds = Math.max(0, Number(seconds) || 0);
+    for (const z of this.zombies) {
+      if (this.cullBlindSeconds > 0) z.flags.cullBlindSeconds = this.cullBlindSeconds;
+      else delete z.flags.cullBlindSeconds;
+    }
+    return this.cullBlindSeconds;
   }
 
   update(dt, player) {

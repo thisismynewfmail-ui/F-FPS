@@ -74,11 +74,35 @@ export class SpriteBillboard {
     this.setCell(col, row);
   }
 
-  /** Death pose: tip backward (away from camera) and fade. t: 0..1 */
+  /**
+   * Graphic death dissolve (t: 0..1). Three layered reads:
+   *  - collapse: tip backward with a squash-and-stretch impact pop,
+   *  - digital glitch (front-loaded): positional jitter + a hot colour flash
+   *    + a fast scanline opacity flicker, decaying over the first half,
+   *  - dissolve: fade to nothing across the whole span.
+   */
   deathPose(t) {
-    this.mesh.rotation.x = t * t * (Math.PI / 2) * 0.9;
-    this.material.opacity = 1 - Math.max(0, (t - 0.35) / 0.65);
-    this.material.transparent = true;
+    const m = this.mesh, mat = this.material;
+    mat.transparent = true;
+    if (this._deathBase === undefined) this._deathBase = { x: m.position.x, y: m.position.y };
+    const b = this._deathBase;
+
+    // collapse
+    m.rotation.x = Math.min(Math.PI * 0.5, t * t * Math.PI * 0.6);
+    const pop = 1 + Math.sin(Math.min(1, t * 3) * Math.PI) * 0.3;
+    m.scale.set(pop, Math.max(0.25, 1 - t * 0.4), 1);
+
+    // digital glitch, strongest at the instant of death
+    const glitch = Math.max(0, 1 - t * 2); // 1 -> 0 by t = 0.5
+    m.position.x = b.x + (Math.random() - 0.5) * 0.22 * glitch;
+    m.position.y = b.y + (Math.random() - 0.5) * 0.12 * glitch;
+    const flick = 1 - (Math.random() < 0.3 ? 0.55 : 0) * glitch;
+
+    // hot flash (white -> red) cooling as it dissolves
+    mat.color.setRGB(1, 1 - t * 0.6, 1 - t * 0.85);
+
+    const fade = 1 - Math.max(0, (t - 0.1) / 0.9);
+    mat.opacity = Math.max(0, fade * flick);
   }
 
   dispose() {

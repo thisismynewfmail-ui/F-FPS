@@ -121,9 +121,13 @@ function makeTexture(img) {
  * Remove the background of a white-backdrop sprite sheet.
  *
  * Flood fills from every border pixel across near-white pixels and clears
- * only that connected region, so interior white details survive.
+ * only that connected region, so interior white details survive. Then erodes
+ * the antialiased near-white *fringe* the flood leaves behind — otherwise a
+ * ring of half-white edge pixels stays opaque and reads as a white halo
+ * around every sprite (which it did). Erosion only touches bright, desaturated
+ * pixels on the silhouette edge, so grey skin and interior whites are safe.
  */
-function keyOutBackground(img, threshold = 234) {
+function keyOutBackground(img, threshold = 232) {
   const c = document.createElement('canvas');
   c.width = img.width; c.height = img.height;
   const ctx = c.getContext('2d', { willReadFrequently: true });
@@ -149,6 +153,33 @@ function keyOutBackground(img, threshold = 234) {
     d[p * 4 + 3] = 0;
     stack.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
   }
+
+  erodeWhiteFringe(d, w, h);
   ctx.putImageData(data, 0, 0);
   return c;
+}
+
+/**
+ * Clear the bright, near-white fringe pixels left along a keyed silhouette.
+ * A pixel is eroded only if it is (a) still opaque, (b) near-white/desaturated
+ * (every channel high), and (c) touching a transparent pixel. Two passes peel
+ * the 1–2px antialiased halo without eating the sprite body.
+ */
+function erodeWhiteFringe(d, w, h, passes = 2, lightMin = 176) {
+  const n = w * h;
+  for (let pass = 0; pass < passes; pass++) {
+    const alpha0 = new Uint8Array(n);
+    for (let p = 0; p < n; p++) alpha0[p] = d[p * 4 + 3];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const p = y * w + x;
+        if (alpha0[p] === 0) continue;
+        const i = p * 4;
+        if (Math.min(d[i], d[i + 1], d[i + 2]) < lightMin) continue; // grey/coloured body: keep
+        const edge = (x > 0 && alpha0[p - 1] === 0) || (x < w - 1 && alpha0[p + 1] === 0)
+          || (y > 0 && alpha0[p - w] === 0) || (y < h - 1 && alpha0[p + w] === 0);
+        if (edge) d[i + 3] = 0;
+      }
+    }
+  }
 }

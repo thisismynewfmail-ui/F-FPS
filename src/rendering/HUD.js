@@ -52,11 +52,8 @@ export class HUD {
     const prog = this._el('div', 'progress', tc, 'panel');
     this.progFill = this._el('div', 'progress-fill', prog);
 
-    // top-right: stats
-    const tr = this._el('div', 'hud-tr', null, 'panel');
-    this.accEl = this._el('div', 'acc', tr);
-    this.pointsEl = this._el('div', 'points', tr);
-    this.secretsEl = this._el('div', 'secrets', tr);
+    // (Run stats — accuracy / score / secrets — live on the pause screen only,
+    // rendered as circular gauges. They are deliberately absent from the HUD.)
 
     // bottom-left: health
     const bl = this._el('div', 'hud-bl', null, 'panel');
@@ -97,12 +94,12 @@ export class HUD {
       <div class="controls">
         <span>WASD — MOVE</span><span>MOUSE — LOOK / FIRE</span><span>SHIFT — SPRINT</span>
         <span>CTRL — CROUCH</span><span>SPACE — JUMP</span><span>1-5 — WEAPONS</span>
-        <span>R — RELOAD</span><span>RMB — SCOPE (SNIPER)</span><span>E — INTERACT</span><span>ESC — PAUSE</span>
+        <span>R — RELOAD</span><span>RMB — SCOPE (SNIPER)</span><span>E — INTERACT</span><span>TAB — SATCHEL</span><span>ESC — PAUSE</span>
       </div>
       <button id="btn-start">ENTER THE FOG</button>`);
     this.pauseEl = this._screen('pause', `
       <h1>PAUSED</h1>
-      <div id="pause-stats" class="statgrid"></div>
+      <div id="pause-stats" class="statrings"></div>
       <button id="btn-resume">RESUME</button>`);
     this.deadEl = this._screen('dead', `
       <h1 class="blood">YOU DIED</h1>
@@ -234,10 +231,33 @@ export class HUD {
       <span>TANKS</span><b>${(stats.byType.Tank || 0).toLocaleString('en-US')}</b>`;
   }
 
+  /** One circular gauge. ratio 0..1 fills the arc; centre shows num + sub. */
+  _ring(label, ratio, num, sub, cls = '') {
+    const C = 2 * Math.PI * 44;
+    const off = C * (1 - Math.max(0, Math.min(1, ratio)));
+    return `<div class="ring"><div class="ring-wrap">
+        <svg viewBox="0 0 104 104">
+          <circle class="track" cx="52" cy="52" r="44"></circle>
+          <circle class="arc ${cls}" cx="52" cy="52" r="44"
+            stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"></circle>
+        </svg>
+        <div class="ring-val"><div class="ring-num">${num}</div><div class="ring-sub">${sub}</div></div>
+      </div><div class="ring-label">${label}</div></div>`;
+  }
+
+  /** Pause-screen stats as a row of circular gauges. */
   fillPauseStats(stats, secrets) {
     const el = document.getElementById('pause-stats');
-    this._fillStats(el, stats);
-    el.innerHTML += `<span>SECRETS</span><b>${secrets.found}/${secrets.total}</b>`;
+    const t = stats.timePlayed;
+    const hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = Math.floor(t % 60);
+    const time = (hh ? hh + ':' : '') + String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+    const secRatio = secrets.total ? secrets.found / secrets.total : 0;
+    el.innerHTML =
+      this._ring('ACCURACY', stats.accuracy, `${(stats.accuracy * 100).toFixed(0)}%`, `${stats.shotsHit}/${stats.shotsFired}`, 'blue') +
+      this._ring('PROGRESS', stats.kills / WIN_KILLS, stats.kills.toLocaleString('en-US'), `/ ${(WIN_KILLS / 1000) | 0}k`, 'green') +
+      this._ring('SECRETS', secRatio, `${secrets.found}/${secrets.total}`, 'FOUND') +
+      this._ring('SCORE', 1, stats.points.toLocaleString('en-US'), 'POINTS', 'green') +
+      this._ring('SURVIVED', 1, time, 'TIME', 'blue');
   }
 
   fillDeadStats(stats) {
@@ -272,10 +292,7 @@ export class HUD {
     this.respiteEl.textContent = d.wave.state === 'respite' ? 'next wave in ' + Math.ceil(d.wave.respiteLeft) + 's' : '';
     this.zoneEl.textContent = d.zoneName.toUpperCase();
 
-    // stats
-    this.accEl.textContent = 'ACC ' + (d.accuracy * 100).toFixed(0) + '%';
-    this.pointsEl.textContent = 'SCORE ' + d.points.toLocaleString('en-US');
-    this.secretsEl.textContent = 'SECRETS ' + d.secrets.found + '/' + d.secrets.total;
+    // (accuracy / score / secrets intentionally not shown on the HUD)
 
     // weapon menu (built once, then refreshed; visibility handled by timer)
     if (!this.slotEls.length) {

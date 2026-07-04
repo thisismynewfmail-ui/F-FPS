@@ -194,6 +194,61 @@ html, body {
 .statgrid span { color: #8a9478; }
 .statgrid b { color: #e8e8d0; text-align: right; }
 
+/* inventory / satchel (Tab) */
+#inventory {
+  position: absolute; inset: 0; z-index: 55;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(6, 8, 8, 0.78); pointer-events: auto;
+}
+#inventory.inv-ping .inv-panel { animation: invping 0.4s ease-out; }
+@keyframes invping { 0% { border-color: #e0b840; } 100% { border-color: #4a5240; } }
+.inv-panel {
+  background: rgba(10, 12, 10, 0.96); border: 2px solid #4a5240;
+  padding: 16px 18px 14px; min-width: 460px; max-width: 70vw;
+}
+.inv-title {
+  font-size: 16px; letter-spacing: 4px; color: #e0b840;
+  border-bottom: 2px solid #3a4232; padding-bottom: 8px; margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.inv-hint { font-size: 10px; letter-spacing: 2px; color: #6a7462; }
+.inv-grid {
+  display: grid; grid-template-columns: repeat(5, 76px); gap: 8px; justify-content: center;
+}
+.inv-slot {
+  width: 76px; height: 76px; position: relative;
+  border: 2px solid #3a4232; background: rgba(8, 10, 8, 0.6);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.inv-slot.filled { border-color: #6a5f30; background: rgba(30, 28, 12, 0.6); }
+.inv-icon { image-rendering: pixelated; }
+.inv-count {
+  position: absolute; right: 4px; bottom: 3px; font-size: 12px; font-weight: bold;
+  color: #e8e8d0;
+}
+.inv-name {
+  position: absolute; left: 0; right: 0; bottom: -14px; font-size: 8px;
+  letter-spacing: 1px; color: #8a9478; text-align: center; white-space: nowrap; overflow: hidden;
+}
+.inv-foot { margin-top: 20px; font-size: 11px; color: #6a7462; text-align: center; letter-spacing: 1px; }
+
+/* circular stat gauges (pause screen) */
+.statrings { display: flex; flex-wrap: wrap; gap: 22px; justify-content: center; max-width: 560px; }
+.ring { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 118px; }
+.ring svg { width: 104px; height: 104px; transform: rotate(-90deg); }
+.ring .track { fill: none; stroke: #2a3226; stroke-width: 9; }
+.ring .arc { fill: none; stroke: #e0b840; stroke-width: 9; stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
+.ring .arc.green { stroke: #6a9a4a; }
+.ring .arc.blue { stroke: #6f9fd0; }
+.ring-val {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.ring-wrap { position: relative; width: 104px; height: 104px; }
+.ring-num { font-size: 17px; font-weight: bold; color: #e8e8d0; }
+.ring-sub { font-size: 9px; color: #8a9478; }
+.ring-label { font-size: 11px; letter-spacing: 2px; color: #8a9478; }
+
 /* developer console (` / ~) */
 #console {
   position: absolute; top: 0; left: 0; right: 0; height: 46%;
