@@ -175,6 +175,108 @@ check('noclip passes through solid geometry', flew.stayedInside);
 check('noclip flies upward on Space', spaceFly > 1, `rose ${spaceFly.toFixed(2)}m`);
 check('noclip off restores collision', noclipOff.off && noclipOff.ejected, JSON.stringify(noclipOff));
 
+// AI SENSORY SYSTEM. Freeze the frame loop and drive the perception/behaviour
+// stack deterministically: directional senses, wall avoidance, the friendly
+// NPC's flee/resume, zombie player-vs-friendly targeting priority, and the
+// opt-in blind-cull flag.
+const ai = await page.evaluate(async () => {
+  const g = window.__game;
+  const world = g.world, player = g.player, cam = g.renderer.camera;
+  g.state.state = 'paused'; // stop frame() from auto-updating; we drive by hand
+  const HX = 0, HZ = 48;    // an open hub south of the square
+  const groundAt = (x, z) => world.groundHeightFor(x, z, 1e9);
+  const mkCtx = () => ({ player, camPos: cam.position, pathBudget: { n: 4 }, time: g.time,
+    zombies: g.spawner.zombies, friendlies: g.friendlies });
+  const step = (ent, ctx, n, dt = 0.05) => { for (let i = 0; i < n; i++) ent.update(dt, ctx); };
+  const out = {};
+
+  // 1. Direction-aware senses: the forward vector tracks yaw exactly.
+  const npc = g.npc;
+  npc.yaw = Math.PI / 2; npc.senses.update(0.2, npc);
+  out.forwardAligned = Math.abs(npc.senses.forward.x - 1) < 0.01 && Math.abs(npc.senses.forward.z) < 0.01;
+
+  // 2. Wall avoidance: with a box dead ahead the avoid vector points backward.
+  npc.position.set(HX, groundAt(HX, HZ), HZ); npc.yaw = 0; // facing +Z
+  const boxId = world.collision.addBox(HX - 1.5, npc.position.y, HZ + 1.2, HX + 1.5, npc.position.y + 3, HZ + 2.4, 'test');
+  npc.senses._timer = 0; npc.senses.update(0.2, npc);
+  const av = npc.senses.avoid;
+  out.avoidsWall = av.strength > 0 && (av.x * 0 + av.z * 1) < 0; // opposes +Z facing
+  world.collision.remove(boxId);
+  npc.senses._timer = 0; npc.senses.update(0.2, npc);
+  out.clearWhenOpen = npc.senses.avoid.strength === 0;
+
+  // 3. Friendly NPC flees a nearby zombie, then resumes when it is gone.
+  // Sideline the live horde so only our test zombie is a threat, then borrow
+  // one of them (spawn points near this hub may be in a locked zone).
+  const stash = g.spawner.zombies.map((z) => ({ z, x: z.position.x, zz: z.position.z, st: z.state }));
+  for (const s of stash) { s.z.position.x = HX; s.z.position.z = HZ + 9000; }
+  let threat = g.spawner.zombies.find((z) => z.state !== 'dead') || g.spawner.spawnOne('walker', player);
+  threat.state = 'idle'; threat.alive = true;
+  threat.position.set(HX + 15, groundAt(HX + 15, HZ), HZ); // 15 m < walker enter band (35 m)
+  npc.position.set(HX, groundAt(HX, HZ), HZ); npc._threat = null; npc.brain.current = null;
+  step(npc, mkCtx(), 8);
+  out.fleeing = npc.brain.state === 'flee';
+  const dNear = Math.hypot(npc.position.x - threat.position.x, npc.position.z - threat.position.z);
+  step(npc, mkCtx(), 30);
+  const dFar = Math.hypot(npc.position.x - threat.position.x, npc.position.z - threat.position.z);
+  out.fledAway = dFar > dNear + 1;
+  threat.position.z = HZ + 9000; // threat gone → she should settle
+  out.resumed = false;
+  for (let i = 0; i < 80; i++) { npc.update(0.05, mkCtx()); if (npc.brain.state !== 'flee') { out.resumed = true; break; } }
+  out.resumedTo = npc.brain.state;
+  for (const s of stash) { s.z.position.x = s.x; s.z.position.z = s.zz; } // restore horde
+
+  // 4. Zombie targeting: player is seen anywhere (no range gate); friendly NPC
+  // only within its sight range; player always outranks the friendly.
+  const zz = g.spawner.zombies.find((z) => z.state !== 'dead') || threat;
+  zz.position.set(HX, groundAt(HX, HZ), HZ); zz.state = 'idle'; zz.victim = null;
+  player.teleport(HX, groundAt(HX, HZ - 80), HZ - 80); player.alive = true; // 80 m > sightRange 50
+  step(zz, mkCtx(), 6);
+  out.chasesPlayerFar = zz.victim === player && (zz.state === 'chasing' || zz.state === 'attacking');
+  // player unavailable → the friendly within range becomes the target
+  player.alive = false;
+  npc.alive = true; npc.mesh.visible = true;
+  npc.position.set(HX + 10, groundAt(HX + 10, HZ), HZ);
+  zz.state = 'idle'; zz.victim = null; zz.yaw = Math.atan2(npc.position.x - zz.position.x, npc.position.z - zz.position.z);
+  step(zz, mkCtx(), 6);
+  out.targetsFriendly = zz.victim === npc && (zz.state === 'chasing' || zz.state === 'attacking');
+  // friendly beyond sight range → not a target
+  npc.position.set(HX + 70, groundAt(HX + 70, HZ), HZ); // 70 m > sightRange 50
+  zz.state = 'idle'; zz.victim = null;
+  step(zz, mkCtx(), 4);
+  out.ignoresFarFriendly = zz.victim === null && zz.state !== 'chasing' && zz.state !== 'attacking';
+  player.alive = true;
+
+  // 5. Blind-cull flag (opt-in): a zombie with no clear line to the player for
+  // its window is removed without scoring; one without the flag is not.
+  player.teleport(0, groundAt(0, 20), 20);
+  const spawnAt = (x, z) => { const c = g.spawner.spawnOne('walker', player) || g.spawner.zombies.find((a) => a.state !== 'dead'); c.position.set(x, groundAt(x, z), z); c.state = 'idle'; c._losTimer = 999; c._hasLos = false; c.blindTimer = 0; return c; };
+  g.spawner.setCull(0.15);
+  const culled = spawnAt(0, 60); culled.flags.cullBlindSeconds = 0.15;
+  const kept = spawnAt(3, 60); delete kept.flags.cullBlindSeconds;
+  const killsBefore = g.score.kills;
+  for (let i = 0; i < 12; i++) { culled.update(0.05, mkCtx()); kept.update(0.05, mkCtx()); }
+  out.cullFires = culled.toRemove === true && culled.state === 'dead';
+  out.cullNoScore = g.score.kills === killsBefore;
+  out.noFlagSurvives = kept.toRemove !== true;
+
+  g.spawner.setCull(30); // restore the shipped default
+  g.state.state = 'playing';
+  return out;
+});
+check('senses forward vector is aligned with facing', ai.forwardAligned);
+check('whiskers steer away from a wall dead ahead', ai.avoidsWall);
+check('no avoidance in open space', ai.clearWhenOpen);
+check('friendly NPC flees a nearby zombie', ai.fleeing);
+check('fleeing opens distance from the threat', ai.fledAway);
+check('friendly NPC resumes when safe', ai.resumed, `-> ${ai.resumedTo}`);
+check('zombie sees the player past its sight range', ai.chasesPlayerFar);
+check('zombie hunts a friendly when the player is unavailable', ai.targetsFriendly);
+check('friendly beyond sight range is not targeted', ai.ignoresFarFriendly);
+check('blind-cull flag removes a stuck zombie', ai.cullFires);
+check('cull does not count as a kill', ai.cullNoScore);
+check('zombie without the flag is not culled', ai.noFlagSurvives);
+
 // 4 + 5. win condition, exact — via the same registerKill pipeline that
 // 'zombie:death' events call, in batches to keep the page responsive.
 const win = await page.evaluate(async () => {

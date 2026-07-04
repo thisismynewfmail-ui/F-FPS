@@ -45,12 +45,19 @@ export class Game {
     this.score = new ScoreSystem(this.events);
     this.waves = new WaveSystem(this.events, this.score);
     this.spawner = new SpawnSystem(this.events, this.world, this.texLib, this.renderer.scene, this.waves);
+    // Actively add the blind-cull flag (a tag/flag, not baked-in behaviour):
+    // any zombie that can't get an unobstructed line to the player for 30s is
+    // removed, so a straggler stuck behind geometry never stalls a wave.
+    this.spawner.setCull(30);
     this.weapons = new WeaponManager(this.events, this.world, this.player, this.renderer);
     this.weapons.zombies = this.spawner.zombies;
     this.pickups = new PickupManager(this.events, this.world, this.texLib, this.renderer.scene);
     this.pickups.seedInitial();
     this.npc = new NPC(this.events, this.world, this.texLib.get('npcPeaceful'));
     this.renderer.scene.add(this.npc.mesh);
+    // Friendlies zombies may fall back to hunting, and the roster the NPCs
+    // sense threats from — one list, so new NPC archetypes just slot in.
+    this.friendlies = [this.npc];
     this.effects = new Effects(this.events, this.renderer.scene, this.texLib, this.player);
     this.viewModel = new WeaponView(this.events, this.renderer, this.texLib);
     this.audio = new AudioManager(this.events);
@@ -164,9 +171,17 @@ export class Game {
     this._prompt = it ? it.prompt : null;
     if (it && this.input.wasPressed('KeyE')) it.onInteract();
 
-    // AI + simulation
+    // AI + simulation. One shared sensory context: the player, the zombie
+    // horde and the friendly roster, so every agent perceives the same world.
     const pathBudget = { n: 4 };
-    const ctx = { player: this.player, camPos: cam.position, pathBudget, time: this.time };
+    const ctx = {
+      player: this.player,
+      camPos: cam.position,
+      pathBudget,
+      time: this.time,
+      zombies: this.spawner.zombies,
+      friendlies: this.friendlies,
+    };
     for (const z of this.spawner.zombies) z.update(dt, ctx);
     this.spawner.update(dt, this.player);
     this.waves.update(dt, this.player.alive);

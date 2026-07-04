@@ -14,7 +14,15 @@ export class Entity {
     this.radius = 0.4;
     this.height = 1.7;
     this.alive = true;
+    // Faction/role tags (e.g. 'player', 'friendly', 'zombie') let senses and
+    // targeting filter entities generically, and flags carry opt-in per-entity
+    // AI switches (e.g. cullBlindSeconds) without baking them into subclasses.
+    this.tags = new Set();
+    this.flags = {};
   }
+
+  addTag(tag) { this.tags.add(tag); return this; }
+  hasTag(tag) { return this.tags.has(tag); }
 
   distanceTo(other) {
     const dx = this.position.x - other.position.x;

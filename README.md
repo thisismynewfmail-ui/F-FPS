@@ -83,10 +83,32 @@ There is deliberately no command that touches the kill counter — the
   pipeline; the victory screen (time survived, accuracy, kills by type)
   fires the moment the counter reaches 250,000 — verified by an automated
   test at 249,999 vs 250,000.
+- **NPC AI (sensory system):** a shared, modular perception→behaviour stack in
+  `src/ai/` any NPC composes. `Senses` turns the world into readings —
+  direction-aware obstacle whiskers (so agents wander and escape spawn houses
+  without grinding on walls), target perception with detection range, a
+  forward field-of-view cone and line of sight. `Steering` blends seek/flee
+  with those whiskers (avoidance rides under everything, which is where the
+  emergent behaviour comes from). `Behavior` is a priority arbiter with
+  anti-flicker hysteresis. Faction **tags** and per-entity **flags** on the
+  base `Entity` let targeting and opt-in behaviours attach without touching
+  subclasses.
 - **Zombies:** Walkers (30 HP, 1 pt), Sprinters (15 HP, fast, 2 pts), Tanks
   (220 HP, 5 pts). State machine: idle → wandering → alerted → chasing →
-  attacking → dead, with line-of-sight detection, A* pathfinding on a nav
-  grid, and gunshot-noise attraction (the bat is silent).
+  attacking → dead. They have **global awareness of the player** (always know
+  where you are, anywhere on the map) but must earn a clear line of sight to
+  attack or beeline vs. A* pathfind out of a building. They also detect the
+  **friendly NPC within a limited sight range**, but the player always takes
+  priority. Gunshots emit noise the idle/wandering ones investigate.
+  Opt-in flag: `cullBlindSeconds` (set to 30 by the game, `cull` in the dev
+  console) removes any zombie that can't get an unobstructed line to the player
+  for that long, so a straggler stuck behind geometry never stalls a wave.
+- **Friendly NPC:** the survivor by the well runs the same stack — Flee ▸
+  Wander ▸ Idle behaviours arbitrated by her Senses. She flees any zombie that
+  comes hunting and keeps running until it is out of sight, then returns to
+  roaming near home. Her flee band is tied to the hunting zombie's own sight
+  range (bolt at ~70% of it, safe past 100%), so "flee until out of sight" is
+  literally correlated to zombie sight distance.
 - **Waves:** escalating hordes with respite periods and supply drops;
   sprinter/tank share rises with wave number and progress toward 250,000.
 - **Progression:** six districts unlock at kill milestones — Old Town
@@ -107,6 +129,7 @@ assets/sprites/     provided NPC/zombie sprite sheets (3x4 walk cycles)
 lib/three.module.js vendored Three.js r169
 scripts/            generate_textures.mjs — regenerates assets/textures/
 src/engine/         game loop, input, event bus
+src/ai/             sensory system: senses, steering, behaviour arbiter
 src/entities/       player, zombies, NPC, pickups
 src/weapons/        weapon configs + firing/ammo/hit resolution
 src/rendering/      renderer, texture pipeline, billboards, HUD, 3D weapon
@@ -126,6 +149,11 @@ tests/              Playwright smoke test (boot, combat, exact win condition)
   it up from the config.
 - **New zombie type:** add a config to `src/entities/ZombieTypes.js`
   (stats + tint); the spawn director and HUD pick it up.
+- **New NPC / behaviour:** give the entity a `Senses` from `src/ai/` and a
+  `Brain` composed of `Behavior`s (each scores itself from the sensory
+  context; highest wins). Reuse `seek`/`flee`/`avoidObstacles` for movement.
+  New behaviours slot into the arbiter without touching the others; new
+  factions are just a tag; new opt-in switches are just a flag.
 - **Reskin:** every texture path lives in
   `src/rendering/TextureConfig.js`; replace a PNG on disk (e.g. the brick
   wall) and every wall in the game changes. New white-background sprite

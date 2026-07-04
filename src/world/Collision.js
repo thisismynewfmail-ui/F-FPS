@@ -101,6 +101,29 @@ export class CollisionWorld {
     return best;
   }
 
+  /**
+   * Cast several short rays from one origin and return the nearest hit
+   * distance per direction (or maxDist if clear). Uses the broadphase grid so
+   * whisker probing stays cheap: candidates are gathered once for the whole
+   * fan, since all rays share the same small neighbourhood.
+   * dir vectors are {x,y,z} of unit length; results are in world units.
+   */
+  probe(origin, dirs, maxDist) {
+    const r = maxDist + 0.5;
+    const cand = this._candidates(origin.x - r, origin.z - r, origin.x + r, origin.z + r, this._rayScratch ??= []);
+    const out = [];
+    for (const d of dirs) {
+      let best = maxDist;
+      for (const b of cand) {
+        if (!b.active) continue;
+        const t = raySlab(origin, d, b, maxDist);
+        if (t < best) best = t;
+      }
+      out.push(best);
+    }
+    return out;
+  }
+
   /** True if a straight segment is blocked by any box. */
   segmentBlocked(ax, ay, az, bx, by, bz) {
     const dx = bx - ax, dy = by - ay, dz = bz - az;

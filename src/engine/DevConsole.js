@@ -111,6 +111,7 @@ const COMMANDS = {
     con.print('give            fill every weapon\'s magazine and reserve');
     con.print('tp <x> <z>      teleport to map coordinates (spawn is 0 20)');
     con.print('speed <mult>    movement speed multiplier (0.1 – 10)');
+    con.print('cull <s|off>    remove zombies blind to the player for s seconds');
     con.print('pos             print current position');
     con.print('clear           clear this log');
   },
@@ -157,6 +158,19 @@ const COMMANDS = {
     if (!Number.isFinite(m) || m < 0.1 || m > 10) throw new Error('usage: speed <0.1 – 10>');
     game.player.speedMult = m;
     con.print('speed multiplier: ' + m, 'ok');
+  },
+
+  cull(con, game, args) {
+    const a = (args[0] || '').toLowerCase();
+    if (a === 'off' || a === '0') {
+      game.spawner.setCull(0);
+      con.print('blind-cull flag OFF — zombies are no longer removed for losing sight of you');
+      return;
+    }
+    const s = args[0] ? Number(args[0]) : 30;
+    if (!Number.isFinite(s) || s <= 0) throw new Error('usage: cull <seconds|off>');
+    game.spawner.setCull(s);
+    con.print(`blind-cull flag ON — zombies with no clear line to you for ${s}s are removed`, 'ok');
   },
 
   pos(con, game) {
