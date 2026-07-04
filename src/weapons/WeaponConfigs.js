@@ -1,19 +1,27 @@
 /**
  * Weapon definitions — pure data.
  *
- * Adding a weapon = adding a config object here (and a sprite in
- * TextureConfig). Damage, fire rate, magazine, spread, sounds and view
- * sprite are all read from the config; no core system changes needed.
+ * Each weapon carries a themed identity (`flavor`), primary stats, and an
+ * `alt` block describing its right-mouse secondary fire. Damage, fire rate,
+ * magazine, spread, sounds and the alt-fire behaviour are all read from the
+ * config; the 3D model + animation rig lives in WeaponModels.js keyed by id.
  *
  * spread is in degrees (cone half-angle-ish), range in metres, noise is the
  * radius in which zombies hear the shot.
+ *
+ * alt.mode:
+ *   'auto'   — hold RMB to fire rapidly (pistol hair-trigger), damageMul<1
+ *   'double' — click RMB to fire multiple chambers at once (shotgun), shells>1
+ *   'burst'  — click RMB for a fixed N-round burst (rifle)
+ *   'charge' — click RMB for a heavy wind-up melee swing (bat)
+ *  (the sniper has no alt block: its RMB is the telescopic scope, via `zoom`.)
  */
 export const WEAPON_CONFIGS = [
   {
     id: 'pistol',
     name: 'PISTOL',
+    flavor: 'REGENT AUTOLOADER',
     slot: 1,
-    icon: 'weaponPistol',
     melee: false,
     damage: 12,
     pellets: 1,
@@ -31,12 +39,14 @@ export const WEAPON_CONFIGS = [
     zoom: null,
     sound: 'pistol',
     ammoType: 'ammo_pistol',
+    altLabel: 'HAIR-TRIGGER',
+    alt: { mode: 'auto', fireInterval: 0.10, damageMul: 0.6, spread: 2.6, sound: 'pistolAuto', noise: 34 },
   },
   {
     id: 'shotgun',
     name: 'SHOTGUN',
+    flavor: 'COACH BREAKER',
     slot: 2,
-    icon: 'weaponShotgun',
     melee: false,
     damage: 8,
     pellets: 8,
@@ -55,12 +65,14 @@ export const WEAPON_CONFIGS = [
     zoom: null,
     sound: 'shotgun',
     ammoType: 'ammo_shotgun',
+    altLabel: 'BOTH BARRELS',
+    alt: { mode: 'double', shells: 2, pellets: 16, fireInterval: 1.15, spread: 8.5, kickMul: 1.7, knockbackMul: 1.6, sound: 'shotgunDouble', noise: 68 },
   },
   {
     id: 'rifle',
     name: 'ASSAULT RIFLE',
+    flavor: 'AUTOMATON REPEATER',
     slot: 3,
-    icon: 'weaponRifle',
     melee: false,
     damage: 10,
     pellets: 1,
@@ -79,12 +91,14 @@ export const WEAPON_CONFIGS = [
     zoom: null,
     sound: 'rifle',
     ammoType: 'ammo_rifle',
+    altLabel: '3-RND BURST',
+    alt: { mode: 'burst', count: 3, burstSpacing: 0.06, fireInterval: 0.5, spread: 0.7, damageMul: 1.15, sound: 'rifleBurst', noise: 50 },
   },
   {
     id: 'sniper',
     name: 'SNIPER RIFLE',
+    flavor: 'RANGEFINDER',
     slot: 4,
-    icon: 'weaponSniper',
     melee: false,
     damage: 90,
     pellets: 1,
@@ -100,15 +114,16 @@ export const WEAPON_CONFIGS = [
     range: 240,
     noise: 60,
     kick: 3.2,
-    zoom: 3.6,        // right-click scope
+    zoom: 3.6,        // right-click scope (this weapon's secondary action)
     sound: 'sniper',
     ammoType: 'ammo_sniper',
+    altLabel: 'SCOPE',
   },
   {
     id: 'bat',
     name: 'BASEBALL BAT',
+    flavor: 'PISTON BAT',
     slot: 5,
-    icon: 'weaponBat',
     melee: true,
     damage: 34,
     range: 2.4,
@@ -120,5 +135,7 @@ export const WEAPON_CONFIGS = [
     kick: 0,
     zoom: null,
     sound: 'bat',
+    altLabel: 'HEAVY SWING',
+    alt: { mode: 'charge', damageMul: 2.1, knockbackMul: 1.7, arcMul: 1.25, fireInterval: 0.95, sound: 'batCharge' },
   },
 ];

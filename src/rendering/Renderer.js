@@ -29,6 +29,12 @@ export class Renderer {
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 210);
     this.baseZoom = 1;
 
+    // Optional first-person weapon overlay: its own scene + camera, drawn on
+    // top of the world with the depth buffer cleared so the viewmodel never
+    // clips through geometry and is untouched by the world's distance fog.
+    this.overlayScene = null;
+    this.overlayCamera = null;
+
     // Lighting: bright overcast-dusk hemisphere + a low, warm "dying sun".
     // Deliberately generous — a readable scene beats a muddy one.
     const hemi = new THREE.HemisphereLight(0xb4c2d8, 0x4a483a, 1.15);
@@ -62,7 +68,20 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Register the weapon overlay (WeaponView provides scene + camera). */
+  setOverlay(scene, camera) {
+    this.overlayScene = scene;
+    this.overlayCamera = camera;
+  }
+
   render() {
+    this.renderer.autoClear = true;
     this.renderer.render(this.scene, this.camera);
+    if (this.overlayScene && this.overlayCamera) {
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth(); // keep color, draw the weapon on top of everything
+      this.renderer.render(this.overlayScene, this.overlayCamera);
+      this.renderer.autoClear = true;
+    }
   }
 }

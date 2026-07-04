@@ -25,16 +25,37 @@ python3 -m http.server 8000
 | Input | Action |
 | --- | --- |
 | WASD | Move |
-| Mouse | Look / fire (LMB) |
+| Mouse | Look / primary fire (LMB) |
+| RMB | Secondary fire (per weapon — see Arsenal) |
 | Shift | Sprint |
 | Ctrl / C | Crouch |
 | Space | Jump |
 | 1–5 | Pistol / Shotgun / Assault Rifle / Sniper / Bat |
+| Mouse wheel | Cycle weapons (also reveals the weapon menu) |
 | R | Reload |
-| RMB (hold) | Sniper scope |
 | E | Interact |
 | Esc | Pause (releases pointer lock) |
 | ` / ~ | Dev console |
+
+The weapon menu is hidden during play; a number key or a mouse-wheel scroll
+fades it in at the top of the screen, and it fades back out after a couple of
+seconds (or the instant you fire).
+
+## Arsenal
+
+Every weapon is a fully 3D, PBR-textured model with a steampunk / Bioshock
+finish — brass, blued gunsteel, cast iron, copper, oiled walnut and cracked
+leather — animated with an idle sway, a three-phase fire recoil, a full
+reload, and equip/unequip transitions. Each has its own synthesised firing
+sound and a distinct right-mouse secondary action:
+
+| Slot | Weapon | Secondary (RMB) |
+| --- | --- | --- |
+| 1 | Regent Autoloader (pistol) | **Hair-trigger** — rapid auto fire, less damage per round |
+| 2 | Coach Breaker (shotgun) | **Both barrels** — twin blast, two shells, big knockback |
+| 3 | Automaton Repeater (rifle) | **3-round burst** — tight grouping |
+| 4 | Rangefinder (sniper) | **Scope** — telescopic zoom |
+| 5 | Piston Bat (melee) | **Heavy swing** — charged, wider arc, more knockback |
 
 ## Dev console
 
@@ -88,7 +109,8 @@ scripts/            generate_textures.mjs — regenerates assets/textures/
 src/engine/         game loop, input, event bus
 src/entities/       player, zombies, NPC, pickups
 src/weapons/        weapon configs + firing/ammo/hit resolution
-src/rendering/      renderer, texture pipeline, billboards, HUD, view model, effects
+src/rendering/      renderer, texture pipeline, billboards, HUD, 3D weapon
+                    view + PBR weapon materials, effects
 src/audio/          WebAudio synthesis (all sounds)
 src/world/          terrain, buildings, props, vegetation, zones, nav, secrets
 src/systems/        score/win condition, waves, spawning, game state
@@ -97,8 +119,11 @@ tests/              Playwright smoke test (boot, combat, exact win condition)
 
 ## Extensibility
 
-- **New weapon:** add a config object to `src/weapons/WeaponConfigs.js` and
-  a sprite entry in `TextureConfig.js`. Nothing else changes.
+- **New weapon:** add a config object (stats + `alt` secondary fire) to
+  `src/weapons/WeaponConfigs.js` and a 3D model rig to
+  `src/weapons/WeaponModels.js` (built from primitives + the shared PBR
+  materials in `WeaponMaterials.js`). WeaponView, the HUD menu and audio pick
+  it up from the config.
 - **New zombie type:** add a config to `src/entities/ZombieTypes.js`
   (stats + tint); the spawn director and HUD pick it up.
 - **Reskin:** every texture path lives in
