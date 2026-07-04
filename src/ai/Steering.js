@@ -36,3 +36,14 @@ export function avoidObstacles(dx, dz, senses, weight = 1.7) {
   if (!a || a.strength <= 0) return norm(dx, dz);
   return norm(dx + a.x * a.strength * weight, dz + a.z * a.strength * weight);
 }
+
+/**
+ * Rotate a heading by a small, time-varying angle so a moving agent weaves
+ * naturally instead of tracking a dead-straight line — and, across a crowd of
+ * different phases/frequencies, so they don't all march in lockstep columns.
+ */
+export function gaitWobble(x, z, t, phase, freq, amp) {
+  const a = Math.sin(t * freq + phase) * amp;
+  const cs = Math.cos(a), sn = Math.sin(a);
+  return { x: x * cs - z * sn, z: x * sn + z * cs };
+}

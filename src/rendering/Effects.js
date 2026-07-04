@@ -7,7 +7,7 @@ import * as THREE from '../../lib/three.module.js';
  * (and no GC hitching) during combat.
  */
 class ParticlePool {
-  constructor(scene, texture, count, { size, color, gravity, drag }) {
+  constructor(scene, texture, count, { size, color, gravity, drag, blending }) {
     this.count = count;
     this.gravity = gravity;
     this.drag = drag;
@@ -19,8 +19,8 @@ class ParticlePool {
     geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6); // skip culling math
     this.points = new THREE.Points(geo, new THREE.PointsMaterial({
-      map: texture, size, color, transparent: true, alphaTest: 0.15,
-      depthWrite: false, sizeAttenuation: true,
+      map: texture, size, color, transparent: true, alphaTest: blending ? 0.01 : 0.15,
+      depthWrite: false, sizeAttenuation: true, blending: blending ?? THREE.NormalBlending,
     }));
     this.points.frustumCulled = false;
     scene.add(this.points);
@@ -68,20 +68,35 @@ export class Effects {
   constructor(events, scene, texLib, player) {
     this.events = events;
     this.player = player;
-    this.blood = new ParticlePool(scene, texLib.get('blood'), 360,
+    this.blood = new ParticlePool(scene, texLib.get('blood'), 520,
       { size: 0.22, color: 0xffffff, gravity: 12, drag: 0.2 });
     this.dust = new ParticlePool(scene, texLib.get('smoke'), 96,
       { size: 0.5, color: 0xbbb6a8, gravity: -0.4, drag: 0.12 });
+    // Additive "digital" sparks for the death glitch — bright teal motes that
+    // burst up and wink out, reading as the sprite breaking into data.
+    this.spark = new ParticlePool(scene, texLib.get('muzzleFlash'), 220,
+      { size: 0.34, color: 0x7df3d0, gravity: 3, drag: 0.05, blending: THREE.AdditiveBlending });
 
     this.shake = 0;
     this.muzzleLight = new THREE.PointLight(0xffc860, 0, 14);
     scene.add(this.muzzleLight);
+    // A short red pop of light at each death, sold alongside the gib burst.
+    this.deathLight = new THREE.PointLight(0xff3524, 0, 9);
+    scene.add(this.deathLight);
 
     events.on('zombie:hit', ({ pos }) => {
       this.blood.spawn({ x: pos.x, y: pos.y + 1.1, z: pos.z }, 7, 3.2, 0.9, 0.7);
     });
     events.on('zombie:death', ({ pos }) => {
-      this.blood.spawn({ x: pos.x, y: pos.y + 0.9, z: pos.z }, 14, 4.2, 1.1, 0.9);
+      // Much more graphic: a wide, fast gib burst + a digital spark pop + a
+      // flash of red light + a kick of screen shake.
+      this.blood.spawn({ x: pos.x, y: pos.y + 1.0, z: pos.z }, 30, 7.0, 1.4, 1.0);
+      this.blood.spawn({ x: pos.x, y: pos.y + 0.5, z: pos.z }, 12, 3.0, 0.4, 1.3);
+      this.dust.spawn({ x: pos.x, y: pos.y + 0.4, z: pos.z }, 6, 2.0, 1.3, 0.6);
+      this.spark.spawn({ x: pos.x, y: pos.y + 1.1, z: pos.z }, 22, 5.5, 1.3, 0.55);
+      this.deathLight.position.set(pos.x, pos.y + 1.1, pos.z);
+      this.deathLight.intensity = 14;
+      this.addShake(0.03);
     });
     events.on('impact', ({ pos }) => this.dust.spawn(pos, 4, 1.4, 1.4, 0.5));
     events.on('secret:rubble', (pos) => this.dust.spawn(pos, 30, 3, 1.2, 1.2));
@@ -121,7 +136,9 @@ export class Effects {
   update(dt) {
     this.blood.update(dt);
     this.dust.update(dt);
+    this.spark.update(dt);
     this.shake = Math.max(0, this.shake - dt * 0.35);
     this.muzzleLight.intensity = Math.max(0, this.muzzleLight.intensity - dt * 220);
+    this.deathLight.intensity = Math.max(0, this.deathLight.intensity - dt * 42);
   }
 }

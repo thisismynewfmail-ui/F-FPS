@@ -30,7 +30,7 @@ export class AudioManager {
     on('player:damage', () => this.hurt());
     on('player:heal', () => {});
     on('player:died', () => this.deathSting());
-    on('zombie:death', ({ pos }) => this.gurgle(pos));
+    on('zombie:death', ({ pos }) => this.zombieDeath(pos));
     on('zombie:aggro', ({ pos }) => this.growl(pos));
     on('wave:start', () => this.horn());
     on('zone:unlock', () => this.rumble());
@@ -261,6 +261,23 @@ export class AudioManager {
     this._tone('sawtooth', 120, 0.28, 0.1 * s.vol, 0.03, s.pan, 45);
   }
 
+  /**
+   * Graphic, thematically-tuned death: a wet flesh burst + a low body thud +
+   * a sharp bone crack, then a fast descending bit-crushed square arpeggio and
+   * a ring-mod shimmer — the "digital" tail that matches the glitch dissolve.
+   */
+  zombieDeath(pos) {
+    const s = this._spatial(pos, 55);
+    if (!s) return;
+    const v = s.vol, pan = s.pan;
+    this._noise(0.18, 'bandpass', 700, 1.5, 0.24 * v, 0, pan, 170);   // wet burst
+    this._tone('sine', 92, 0.24, 0.28 * v, 0, pan, 38);               // body thud
+    this._noise(0.05, 'highpass', 2700, 1, 0.15 * v, 0.02, pan);      // bone crack
+    const steps = [1200, 820, 560, 380, 240];                        // digital glitch
+    steps.forEach((f, i) => this._tone('square', f, 0.05, 0.09 * v, 0.05 + i * 0.03, pan, f * 0.6));
+    this._noise(0.22, 'bandpass', 3000, 8, 0.05 * v, 0.06, pan, 1100); // ring-mod shimmer
+  }
+
   moan(pan, vol) {
     const f = 65 + Math.random() * 55;
     this._tone('sawtooth', f, 1.4, 0.09 * vol, 0, pan, f * (0.8 + Math.random() * 0.5));
@@ -278,9 +295,20 @@ export class AudioManager {
 
   /* ---------------- world events ---------------- */
 
+  // "New wave" announcement: a concise, warm bell chime-jingle (a rising
+  // G–C–E–G arpeggio resolving up an octave) with a soft shimmer tail —
+  // appealing and clearly readable over combat, not an alarm blare.
   horn() {
-    this._tone('sawtooth', 70, 1.6, 0.24, 0, 0, 95);
-    this._tone('sawtooth', 105, 1.6, 0.16, 0.1, 0, 140);
+    if (!this.ctx) return;
+    const bell = (f, when, gain = 0.16, dur = 0.55) => {
+      this._tone('sine', f, dur, gain, when);            // pure body
+      this._tone('triangle', f * 2, dur * 0.5, gain * 0.35, when); // bright partial
+      this._tone('sine', f * 3, dur * 0.3, gain * 0.12, when);     // sparkle
+    };
+    const seq = [[392, 0], [523, 0.11], [659, 0.22], [784, 0.34]]; // G4 C5 E5 G5
+    for (const [f, w] of seq) bell(f, w);
+    bell(1046, 0.5, 0.14, 0.8);                          // resolve up to C6
+    this._noise(0.5, 'highpass', 6500, 0.7, 0.03, 0.52); // airy shimmer tail
   }
 
   rumble() {

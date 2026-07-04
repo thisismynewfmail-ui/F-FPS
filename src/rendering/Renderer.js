@@ -21,7 +21,8 @@ export class Renderer {
 
     this.scene = new THREE.Scene();
     // Fog and sky share one color so distant geometry melts into the haze
-    // instead of silhouetting against it.
+    // instead of silhouetting against it. The Sky system drives both colours
+    // (and the lights below) each frame over the day/night cycle.
     const sky = new THREE.Color(0x35414f);
     this.scene.background = sky;
     this.scene.fog = new THREE.Fog(sky, 40, FOG_FAR);
@@ -35,16 +36,17 @@ export class Renderer {
     this.overlayScene = null;
     this.overlayCamera = null;
 
-    // Lighting: bright overcast-dusk hemisphere + a low, warm "dying sun".
-    // Deliberately generous — a readable scene beats a muddy one.
-    const hemi = new THREE.HemisphereLight(0xb4c2d8, 0x4a483a, 1.15);
-    this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xe8c890, 1.25);
-    sun.position.set(-0.4, 0.55, 0.25).multiplyScalar(100);
-    this.scene.add(sun);
-    this.sunDirection = sun.position.clone().normalize();
-    const amb = new THREE.AmbientLight(0x49525f, 0.8);
-    this.scene.add(amb);
+    // Lighting: a hemisphere fill, a directional "sun/moon", and ambient.
+    // Exposed so the Sky system can animate colour and intensity through the
+    // day; defaults here are the daytime values (in case Sky is absent).
+    this.hemiLight = new THREE.HemisphereLight(0xb4c2d8, 0x4a483a, 1.15);
+    this.scene.add(this.hemiLight);
+    this.sunLight = new THREE.DirectionalLight(0xe8c890, 1.25);
+    this.sunLight.position.set(-0.4, 0.55, 0.25).multiplyScalar(100);
+    this.scene.add(this.sunLight);
+    this.sunDirection = this.sunLight.position.clone().normalize();
+    this.ambLight = new THREE.AmbientLight(0x49525f, 0.8);
+    this.scene.add(this.ambLight);
 
     window.addEventListener('resize', () => this.resize());
     this.resize();

@@ -11,8 +11,8 @@ import * as THREE from '../../lib/three.module.js';
  */
 export const ZONES = [
   { id: 0, name: 'Old Town Square', kills: 0, rect: { minX: -45, maxX: 45, minZ: -45, maxZ: 45 } },
-  { id: 1, name: 'Eastgate Residential', kills: 500, rect: { minX: 45, maxX: 240, minZ: -110, maxZ: 110 } },
-  { id: 2, name: 'Downtown', kills: 1200, rect: { minX: -140, maxX: 240, minZ: -245, maxZ: -45 } },
+  { id: 1, name: 'Eastgate Residential', kills: 50, rect: { minX: 45, maxX: 240, minZ: -110, maxZ: 110 } },
+  { id: 2, name: 'Downtown', kills: 150, rect: { minX: -140, maxX: 240, minZ: -245, maxZ: -45 } },
   { id: 3, name: 'Hollow Park', kills: 2500, rect: { minX: -245, maxX: -45, minZ: -45, maxZ: 110 } },
   { id: 4, name: 'Southside Industrial', kills: 4500, rect: { minX: -140, maxX: 240, minZ: 45, maxZ: 245 } },
   { id: 5, name: 'Chapel Ridge', kills: 7000, rect: { minX: -245, maxX: -140, minZ: -245, maxZ: -140 } },

@@ -4,14 +4,17 @@ import { DevConsole } from './DevConsole.js';
 import { Renderer } from '../rendering/Renderer.js';
 import { TextureLib } from '../rendering/TextureLib.js';
 import { World } from '../world/World.js';
+import { Sky } from '../world/Sky.js';
 import { Player } from '../entities/Player.js';
 import { NPC } from '../entities/NPC.js';
+import { Cockroach } from '../entities/Cockroach.js';
 import { PickupManager } from '../entities/Pickups.js';
 import { WeaponManager } from '../weapons/WeaponManager.js';
 import { ScoreSystem } from '../systems/ScoreSystem.js';
 import { WaveSystem } from '../systems/WaveSystem.js';
 import { SpawnSystem } from '../systems/SpawnSystem.js';
 import { GameState } from '../systems/GameState.js';
+import { Inventory } from '../systems/Inventory.js';
 import { Effects } from '../rendering/Effects.js';
 import { WeaponView } from '../rendering/WeaponView.js';
 import { HUD } from '../rendering/HUD.js';
@@ -40,6 +43,7 @@ export class Game {
     await this.texLib.loadAll(onProgress);
 
     this.world = new World(this.events, this.texLib, this.renderer.scene).build();
+    this.sky = new Sky(this.renderer, this.texLib);
     this.player = new Player(this.events, this.world, this.input);
     this.world.secrets.attach(this);
     this.score = new ScoreSystem(this.events);
@@ -58,6 +62,10 @@ export class Game {
     // Friendlies zombies may fall back to hunting, and the roster the NPCs
     // sense threats from — one list, so new NPC archetypes just slot in.
     this.friendlies = [this.npc];
+    // The AI-test cockroach: wanders, hides indoors by day, roams out at
+    // night, and skitters away from the player.
+    this.cockroach = new Cockroach(this.events, this.world);
+    this.renderer.scene.add(this.cockroach.mesh);
     this.effects = new Effects(this.events, this.renderer.scene, this.texLib, this.player);
     this.viewModel = new WeaponView(this.events, this.renderer, this.texLib);
     this.audio = new AudioManager(this.events);
@@ -69,6 +77,20 @@ export class Game {
 
     this.devConsole = new DevConsole(this, this.hudRoot);
 
+    // Inventory (Tab): frees the mouse for the UI and freezes the sim while
+    // open; hands the mouse back to the game on close.
+    this.inventory = new Inventory(this.events, this.hudRoot, {
+      canOpen: () => this.state.is('playing') && !this.devConsole.open,
+      onOpen: () => {
+        this.input.setSuppressed(true);
+        if (!this.testMode) this.input.releasePointerLock();
+      },
+      onClose: () => {
+        this.input.setSuppressed(false);
+        if (!this.testMode && this.state.is('playing')) this.input.requestPointerLock();
+      },
+    });
+
     this._wire();
     this.state.to('menu');
     this.hud.showScreen('menu');
@@ -76,9 +98,9 @@ export class Game {
   }
 
   _wire() {
-    // Losing pointer lock while playing = pause.
+    // Losing pointer lock while playing = pause (unless the satchel took it).
     this.input.onPointerLockChange = (locked) => {
-      if (!locked && this.state.is('playing') && !this.testMode) this.pause();
+      if (!locked && this.state.is('playing') && !this.testMode && !this.inventory.open) this.pause();
     };
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Escape' && this.testMode && !this.devConsole.open) {
@@ -149,7 +171,8 @@ export class Game {
   }
 
   frame(dt) {
-    if (this.state.is('playing')) {
+    // The satchel freezes the world while it's open (mouse is on the UI).
+    if (this.state.is('playing') && !this.inventory.open) {
       this.time += dt;
       this.update(dt);
     }
@@ -181,13 +204,17 @@ export class Game {
       time: this.time,
       zombies: this.spawner.zombies,
       friendlies: this.friendlies,
+      isDay: this.sky.isDay,
+      dayFactor: this.sky.dayFactor,
     };
     for (const z of this.spawner.zombies) z.update(dt, ctx);
     this.spawner.update(dt, this.player);
     this.waves.update(dt, this.player.alive);
     this.npc.update(dt, ctx);
+    this.cockroach.update(dt, ctx);
     this.pickups.update(dt, this.time, this.player, cam.position);
     this.world.update(dt, this.time, cam.position);
+    this.sky.update(dt, cam.position);
     this.effects.update(dt);
     this.audio.update(dt, this.player, this.spawner.nearbyCount(this.player));
 

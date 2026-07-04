@@ -1,7 +1,7 @@
 import { Entity } from './Entity.js';
 import { SpriteBillboard } from '../rendering/Billboard.js';
 import { Senses } from '../ai/Senses.js';
-import { avoidObstacles } from '../ai/Steering.js';
+import { avoidObstacles, gaitWobble } from '../ai/Steering.js';
 
 /**
  * Zombie AI: a small state machine over
@@ -30,7 +30,7 @@ import { avoidObstacles } from '../ai/Steering.js';
  *   keep a stuck straggler from stalling a wave.
  */
 const ACTIVE_RANGE = 115;
-const DEATH_TIME = 1.6;
+const DEATH_TIME = 1.3;
 const FRIENDLY_FOV = 3.66;   // ~210° detection cone for non-player targets
 const FRIENDLY_PROX = 6;     // ...but anything this close is felt regardless
 const EMPTY = [];
@@ -42,8 +42,14 @@ export class Zombie extends Entity {
     this.world = world;
     this.events = events;
     this.hp = config.hp;
-    this.height = config.height * config.scale;
-    this.radius = 0.42 * config.scale;
+    // Slight per-zombie size variation so a horde never looks stamped from one
+    // mould — a shade under to a shade over the type's base height.
+    this.sizeScale = 0.9 + Math.random() * 0.2;
+    this.height = config.height * config.scale * this.sizeScale;
+    this.radius = 0.42 * config.scale * this.sizeScale;
+    // Per-zombie gait so movement weaves instead of tracking a straight line.
+    this.gaitPhase = Math.random() * Math.PI * 2;
+    this.gaitFreq = 1.4 + Math.random() * 1.3;
     this.addTag('zombie');
     this.addTag('hostile');
     this.state = 'idle';
@@ -308,6 +314,11 @@ export class Zombie extends Entity {
 
     // --- integrate movement
     if (moving && speed > 0) {
+      // Weave the heading a little (damped when hugging a wall so avoidance
+      // still wins), so the horde doesn't converge into straight columns.
+      const amp = 0.16 * (1 - this.senses.avoid.strength);
+      const w = gaitWobble(moveX, moveZ, ctx.time || 0, this.gaitPhase, this.gaitFreq, amp);
+      moveX = w.x; moveZ = w.z;
       const slope = this.world.terrain.slopeAlong(this.position.x, this.position.z, moveX, moveZ);
       let s = speed;
       if (slope > 0.35) s /= 1 + (slope - 0.35) * 2;
