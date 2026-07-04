@@ -34,6 +34,26 @@ python3 -m http.server 8000
 | RMB (hold) | Sniper scope |
 | E | Interact |
 | Esc | Pause (releases pointer lock) |
+| ` / ~ | Dev console |
+
+## Dev console
+
+Press `` ` `` (backtick / tilde) to drop the developer console. It owns the
+keyboard while open and the game keeps running behind it. Commands:
+
+| Command | Effect |
+| --- | --- |
+| `noclip` | Fly through all geometry — WASD to move, Space up, Ctrl down, Shift for fast |
+| `god` | Toggle invulnerability |
+| `heal [n]` | Restore health (default: full) |
+| `give` | Fill every weapon's magazine and reserve |
+| `tp <x> <z>` | Teleport to map coordinates (spawn is `0 20`) |
+| `speed <mult>` | Movement speed multiplier (0.1–10) |
+| `pos` | Print current position |
+| `help` / `clear` | List commands / clear the log |
+
+There is deliberately no command that touches the kill counter — the
+250,000 win condition has no shortcuts, console included.
 
 ## The game
 

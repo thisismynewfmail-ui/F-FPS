@@ -1,5 +1,6 @@
 import { EventBus } from './Events.js';
 import { Input } from './Input.js';
+import { DevConsole } from './DevConsole.js';
 import { Renderer } from '../rendering/Renderer.js';
 import { TextureLib } from '../rendering/TextureLib.js';
 import { World } from '../world/World.js';
@@ -59,6 +60,8 @@ export class Game {
       onRespawn: () => this.respawn(),
     });
 
+    this.devConsole = new DevConsole(this, this.hudRoot);
+
     this._wire();
     this.state.to('menu');
     this.hud.showScreen('menu');
@@ -71,7 +74,7 @@ export class Game {
       if (!locked && this.state.is('playing') && !this.testMode) this.pause();
     };
     document.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape' && this.testMode) {
+      if (e.code === 'Escape' && this.testMode && !this.devConsole.open) {
         if (this.state.is('playing')) this.pause();
         else if (this.state.is('paused')) this.startPlaying();
       }

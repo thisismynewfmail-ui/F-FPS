@@ -97,17 +97,30 @@ check('firing consumes ammo + counts the shot', fired.magAfter === fired.magBefo
 await page.waitForTimeout(1500);
 if (takeScreens) await page.screenshot({ path: join(SCREEN_DIR, 'shot_gameplay.png') });
 
-// end-to-end combat: place a walker in front of the muzzle and gun it down;
-// the kill must arrive via the zombie:death -> ScoreSystem pipeline.
+// end-to-end combat AT RANGE: place a walker 25 m out on sloped ground, aim
+// the crosshair at its chest and gun it down. The kill must arrive via the
+// zombie:death -> ScoreSystem pipeline. (Regression guard for the inverted
+// vertical aim bug: point-blank shots hit even with broken pitch; 25 m
+// shots only hit when lookDirection matches the camera.)
 const combat = await page.evaluate(async () => {
   const g = window.__game;
   const p = g.player;
   const killsBefore = g.score.kills;
+  p.teleport(150, g.world.groundHeightFor(150, 90, 1e9), 90); // open knoll field
   const z = g.spawner.spawnOne('walker', p) ?? g.spawner.zombies[0];
-  z.placeAt(p.position.x - Math.sin(p.yaw) * 5, p.position.z - Math.cos(p.yaw) * 5);
-  p.pitch = 0;
-  for (let i = 0; i < 12 && z.state !== 'dead'; i++) {
+  z.placeAt(150, 65); // 25 m north, different elevation on the knoll
+  const aim = () => {
+    const eye = p.eyePosition();
+    const dx = z.position.x - eye.x;
+    const dy = z.position.y + z.height * 0.55 - eye.y;
+    const dz = z.position.z - eye.z;
+    p.yaw = Math.atan2(-dx, -dz);
+    p.pitch = Math.asin(dy / Math.hypot(dx, dy, dz));
+  };
+  for (let i = 0; i < 15 && z.state !== 'dead'; i++) {
+    aim();
     g.weapons.current.cooldown = 0;
+    g.weapons.current.bloom = 0; // isolate aim from recoil bloom
     g.weapons.current.mag = Math.max(1, g.weapons.current.mag);
     g.weapons.tryFire();
     await new Promise(requestAnimationFrame);
@@ -115,9 +128,52 @@ const combat = await page.evaluate(async () => {
   await new Promise(requestAnimationFrame);
   return { dead: z.state === 'dead', kills: g.score.kills, killsBefore, hits: g.score.shotsHit };
 });
-check('gunfire kills a zombie through the event pipeline',
+check('gunfire kills a zombie at 25 m through the event pipeline',
   combat.dead && combat.kills === combat.killsBefore + 1 && combat.hits > 0,
   JSON.stringify(combat));
+
+// dev console: ` opens it, typed "noclip" grants flight through geometry
+await page.keyboard.press('Backquote');
+const consoleOpen = await page.evaluate(() => document.getElementById('console').style.display !== 'none');
+await page.keyboard.type('noclip');
+await page.keyboard.press('Enter');
+const noclipOn = await page.evaluate(() => window.__game.player.noclip === true);
+await page.keyboard.press('Backquote'); // close so game input resumes
+const flew = await page.evaluate(async () => {
+  const g = window.__game;
+  const y0 = g.player.position.y;
+  // park the player inside a solid building: with noclip nothing ejects him
+  const tower = [...g.world.built.values()].find((b) => b.spec.name === 'clocktower').spec;
+  g.player.position.set(tower.x, tower.y + 1, tower.z);
+  for (let i = 0; i < 5; i++) await new Promise(requestAnimationFrame);
+  const stayedInside = Math.hypot(g.player.position.x - tower.x, g.player.position.z - tower.z) < 1;
+  return { stayedInside, y0 };
+});
+const spaceFly = await page.evaluate(async () => {
+  const g = window.__game;
+  const y0 = g.player.position.y;
+  g.input.keys.add('Space');
+  for (let i = 0; i < 30; i++) await new Promise(requestAnimationFrame);
+  g.input.keys.delete('Space');
+  return g.player.position.y - y0;
+});
+const noclipOff = await page.evaluate(async () => {
+  const g = window.__game;
+  // park back inside the solid tower, then switch noclip off: live
+  // collision must eject the player out of the walls
+  const tower = [...g.world.built.values()].find((b) => b.spec.name === 'clocktower').spec;
+  g.player.position.set(tower.x, tower.y + 1, tower.z);
+  await new Promise(requestAnimationFrame);
+  g.devConsole.execute('noclip');
+  for (let i = 0; i < 20; i++) await new Promise(requestAnimationFrame);
+  const ejected = Math.hypot(g.player.position.x - tower.x, g.player.position.z - tower.z) > 2;
+  return { off: g.player.noclip === false, ejected };
+});
+check('` opens the dev console', consoleOpen);
+check('"noclip" command enables flight', noclipOn);
+check('noclip passes through solid geometry', flew.stayedInside);
+check('noclip flies upward on Space', spaceFly > 1, `rose ${spaceFly.toFixed(2)}m`);
+check('noclip off restores collision', noclipOff.off && noclipOff.ejected, JSON.stringify(noclipOff));
 
 // 4 + 5. win condition, exact — via the same registerKill pipeline that
 // 'zombie:death' events call, in batches to keep the page responsive.

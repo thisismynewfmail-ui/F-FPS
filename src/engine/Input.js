@@ -18,9 +18,10 @@ export class Input {
     this.wheelDelta = 0;
     this.pointerLocked = false;
     this.onPointerLockChange = null;
+    this.suppressed = false; // true while the dev console owns the keyboard
 
     document.addEventListener('keydown', (e) => {
-      if (e.repeat) return;
+      if (e.repeat || this.suppressed) return;
       this.keys.add(e.code);
       this.pressed.add(e.code);
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
@@ -29,11 +30,12 @@ export class Input {
     window.addEventListener('blur', () => this.keys.clear());
 
     document.addEventListener('mousemove', (e) => {
-      if (!this.pointerLocked) return;
+      if (!this.pointerLocked || this.suppressed) return;
       this.mouseDX += e.movementX;
       this.mouseDY += e.movementY;
     });
     document.addEventListener('mousedown', (e) => {
+      if (this.suppressed) return;
       if (e.button < 3) {
         this.mouseDown[e.button] = true;
         this.mousePressed[e.button] = true;
@@ -61,6 +63,19 @@ export class Input {
 
   releasePointerLock() {
     if (document.pointerLockElement) document.exitPointerLock();
+  }
+
+  /** Hand the keyboard/mouse to (or take it back from) an overlay UI. */
+  setSuppressed(v) {
+    this.suppressed = v;
+    if (v) {
+      this.keys.clear();
+      this.pressed.clear();
+      this.mouseDown = [false, false, false];
+      this.mousePressed = [false, false, false];
+      this.mouseDX = 0;
+      this.mouseDY = 0;
+    }
   }
 
   isDown(code) { return this.keys.has(code); }

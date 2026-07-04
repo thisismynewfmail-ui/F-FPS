@@ -125,20 +125,26 @@ export class WeaponManager {
     // Secret targets.
     const shootable = this.world.raycastShootables(origin, dir, worldDist);
 
-    // Zombie cylinder hits along the ray, nearest first.
+    // Zombie cylinder hits along the ray, nearest first. The closest
+    // approach to a vertical cylinder axis happens in the XZ plane, so
+    // project onto the ray's *normalized* XZ direction (a pitched ray has
+    // |dirXZ| < 1 and the raw dot product lands short of the target).
     const hits = [];
-    for (const z of this.zombies) {
-      if (z.state === 'dead') continue;
-      const hitR = 0.42 * z.config.scale + 0.08;
-      const ox = z.position.x - origin.x, oz = z.position.z - origin.z;
-      const t = ox * dir.x + oz * dir.z; // XZ projection is enough for slim cylinders
-      if (t < 0 || t > worldDist) continue;
-      const px = origin.x + dir.x * t - z.position.x;
-      const pz = origin.z + dir.z * t - z.position.z;
-      if (px * px + pz * pz > hitR * hitR) continue;
-      const hitY = origin.y + dir.y * t;
-      if (hitY < z.position.y - 0.1 || hitY > z.position.y + z.height + 0.1) continue;
-      hits.push({ z, t, hitY });
+    const dxz2 = dir.x * dir.x + dir.z * dir.z;
+    if (dxz2 > 1e-8) {
+      for (const z of this.zombies) {
+        if (z.state === 'dead') continue;
+        const hitR = 0.42 * z.config.scale + 0.08;
+        const ox = z.position.x - origin.x, oz = z.position.z - origin.z;
+        const t = (ox * dir.x + oz * dir.z) / dxz2; // 3D ray parameter = distance (dir is unit)
+        if (t < 0 || t > worldDist) continue;
+        const px = origin.x + dir.x * t - z.position.x;
+        const pz = origin.z + dir.z * t - z.position.z;
+        if (px * px + pz * pz > hitR * hitR) continue;
+        const hitY = origin.y + dir.y * t;
+        if (hitY < z.position.y - 0.1 || hitY > z.position.y + z.height + 0.1) continue;
+        hits.push({ z, t, hitY });
+      }
     }
     hits.sort((a, b) => a.t - b.t);
 

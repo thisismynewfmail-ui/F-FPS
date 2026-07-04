@@ -40,6 +40,10 @@ export class Player extends Entity {
     this.speedXZ = 0;
     this.zoomFactor = 1; // written by the weapon system (sniper scope)
     this.invulnTime = 0;
+    // dev-console cheats
+    this.noclip = false;
+    this.godMode = false;
+    this.speedMult = 1;
 
     const s = world.playerSpawn;
     this.teleport(s.x, world.groundHeightFor(s.x, s.z, 1e9), s.z);
@@ -52,9 +56,14 @@ export class Player extends Entity {
     this.grounded = true;
   }
 
+  /** Forward vector matching the camera exactly (YXZ order, -Z forward). */
   lookDirection() {
     const cp = Math.cos(this.pitch);
-    return new THREE.Vector3(Math.sin(this.yaw) * cp, Math.sin(this.pitch), Math.cos(this.yaw) * cp).negate();
+    return new THREE.Vector3(
+      -Math.sin(this.yaw) * cp,
+      Math.sin(this.pitch),
+      -Math.cos(this.yaw) * cp,
+    );
   }
 
   eyePosition() {
@@ -69,6 +78,11 @@ export class Player extends Entity {
     this.yaw -= input.mouseDX * sens;
     this.pitch -= input.mouseDY * sens;
     this.pitch = Math.max(-1.55, Math.min(1.55, this.pitch));
+
+    if (this.noclip) {
+      this._flyUpdate(dt, input);
+      return;
+    }
 
     // --- gait
     this.crouching = input.isDown('ControlLeft') || input.isDown('KeyC');
@@ -85,7 +99,7 @@ export class Player extends Entity {
     const moving = mx !== 0 || mz !== 0;
     this.sprinting = wantSprint && mz > 0;
 
-    let speed = this.crouching ? CROUCH_SPEED : this.sprinting ? SPRINT_SPEED : WALK_SPEED;
+    let speed = (this.crouching ? CROUCH_SPEED : this.sprinting ? SPRINT_SPEED : WALK_SPEED) * this.speedMult;
     const fwdX = -Math.sin(this.yaw), fwdZ = -Math.cos(this.yaw);
     const rightX = -fwdZ, rightZ = fwdX;
     let dx = (fwdX * mz - rightX * mx);
@@ -144,6 +158,35 @@ export class Player extends Entity {
     if (this.invulnTime > 0) this.invulnTime -= dt;
   }
 
+  /** Noclip: free flight, no gravity, no collision — through everything. */
+  _flyUpdate(dt, input) {
+    const look = this.lookDirection();
+    const rightX = -look.z, rightZ = look.x; // horizontal right vector
+    let vx = 0, vy = 0, vz = 0;
+    if (input.isDown('KeyW')) { vx += look.x; vy += look.y; vz += look.z; }
+    if (input.isDown('KeyS')) { vx -= look.x; vy -= look.y; vz -= look.z; }
+    if (input.isDown('KeyA')) { vx -= rightX; vz -= rightZ; }
+    if (input.isDown('KeyD')) { vx += rightX; vz += rightZ; }
+    if (input.isDown('Space')) vy += 1;
+    if (input.isDown('ControlLeft') || input.isDown('KeyC')) vy -= 1;
+    const len = Math.hypot(vx, vy, vz);
+    if (len > 1e-5) {
+      const speed = (input.isDown('ShiftLeft') ? 42 : 16) * this.speedMult;
+      this.position.x += (vx / len) * speed * dt;
+      this.position.y += (vy / len) * speed * dt;
+      this.position.z += (vz / len) * speed * dt;
+    }
+    this.world.clampToWorld(this.position);
+    this.position.y = Math.min(140, Math.max(-30, this.position.y));
+    this.vy = 0;
+    this.grounded = false;
+    this.crouching = false;
+    this.sprinting = false;
+    this.speedXZ = 0;
+    this.bobAmp += (0 - this.bobAmp) * Math.min(1, dt * 6);
+    if (this.invulnTime > 0) this.invulnTime -= dt;
+  }
+
   applyCamera(camera, shakeOffset) {
     const bobY = Math.sin(this.bobPhase * 2) * this.bobAmp;
     const bobX = Math.cos(this.bobPhase) * this.bobAmp * 0.6;
@@ -157,7 +200,7 @@ export class Player extends Entity {
   }
 
   takeDamage(amount, fromPos = null) {
-    if (!this.alive || this.invulnTime > 0) return;
+    if (!this.alive || this.invulnTime > 0 || this.godMode) return;
     this.health = Math.max(0, this.health - amount);
     this.invulnTime = 0.25;
     this.events.emit('player:damage', { amount, health: this.health, fromPos });
