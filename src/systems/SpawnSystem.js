@@ -14,6 +14,10 @@ import { makeSpriteMaterial } from '../rendering/Billboard.js';
  * system so the horde swells with "heat" past 250 kills without overflowing.
  */
 const TANK_SLOTS = 2;
+// Brushing against a live zombie's body costs health, so the player can't just
+// barge straight through the horde. The player's own 0.25s post-hit
+// invulnerability rate-limits this to one bite per pass-through.
+const CONTACT_DAMAGE = 5;
 
 export class SpawnSystem {
   constructor(events, world, texLib, scene, waveSystem) {
@@ -140,6 +144,20 @@ export class SpawnSystem {
         this.zombies.splice(i, 1);
         this.waves.noteRemoved(1);
         if (z.culled) this.waves.refundSpawn(1);
+      }
+    }
+
+    // contact damage: running into a live zombie's body hurts. Gated by the
+    // player's post-hit invulnerability so one pass-through costs one bite.
+    if (player.alive) {
+      for (const z of this.zombies) {
+        if (z.state === 'dead') continue;
+        const dx = z.position.x - player.position.x;
+        const dz = z.position.z - player.position.z;
+        const reach = z.radius + player.radius + 0.15;
+        if (dx * dx + dz * dz > reach * reach) continue;
+        if (Math.abs(z.position.y - player.position.y) > 1.8) continue; // same level only
+        player.takeDamage(CONTACT_DAMAGE, z.position);
       }
     }
 
