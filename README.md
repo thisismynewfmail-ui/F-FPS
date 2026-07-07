@@ -131,18 +131,28 @@ There is deliberately no command that touches the kill counter — the
   away from the player** — but only a very short distance before settling.
 - **Sky & day/night:** a slow cycle colours the sky and fog, swings a sun and
   moon across the dome (the light warms by day and cools to moonlight at
-  night), and drifts a handful of soft procedural clouds overhead. `time
-  <0-24>` in the dev console jumps the clock; the cockroach reads day/night
-  from it.
+  night), and drifts a handful of clouds overhead. The sun, moon and clouds are
+  real low-poly, flat-shaded **3D geometry** (not sprites), depth-tested so the
+  town's rooftops and walls correctly occlude them instead of bleeding through.
+  `time <0-24>` in the dev console jumps the clock; the cockroach reads
+  day/night from it.
 - **Inventory (Tab):** a themed satchel for quest items such as keys. Opening
   frees the mouse for the UI and freezes the world; Tab (or Esc) closes it and
   hands the mouse straight back to the game.
 - **HUD & stats:** the HUD carries only health, ammo, wave/zone and the kill
   counter. Run stats — accuracy, score, secrets, progress, time — live on the
   **pause screen as circular gauges**, not on the HUD.
-- **Waves:** escalating hordes with respite periods and supply drops;
-  sprinter/tank share rises with wave number and progress toward 250,000, and
+- **Waves:** **kill-driven** escalating hordes. Each wave sets a kill quota and
+  clears the moment you hit it, so racking up kills is what advances the wave;
+  then a short respite with a supply drop before the next, larger wave. Past
+  **250 kills** the horde "heats up" — faster spawns, bigger waves and a higher
+  active cap — ramping over the waves that follow without overflowing.
+  Sprinter/tank share rises with wave number and progress toward 250,000, and
   exploders join the table once you clear 120 kills.
+- **Checkpoints & death:** the run is checkpointed every **tenth wave**. When
+  you die, every zombie on the map is cleared and the run rolls back to the last
+  checkpoint — kills, score and wave all restored — then that wave respawns from
+  scratch (die at wave 45 → back to 40).
 - **Progression:** six districts unlock at kill milestones — Old Town
   (start), Eastgate Residential (50), Downtown (150), Hollow Park
   (2,500), Southside Industrial (4,500), Chapel Ridge (7,000). Barricades

@@ -9,8 +9,10 @@ import { makeSpriteMaterial } from '../rendering/Billboard.js';
  * unlocked zones only, in a ring around the player, preferring points the
  * player can't see. Also handles corpse cleanup, loot drops and the
  * zombie-zombie separation pass.
+ *
+ * The concurrent-zombie cap and per-pulse batch size are read from the wave
+ * system so the horde swells with "heat" past 250 kills without overflowing.
  */
-const ACTIVE_CAP = 55;
 const TANK_SLOTS = 2;
 
 export class SpawnSystem {
@@ -75,7 +77,20 @@ export class SpawnSystem {
         if (!visible) return p;
       }
     }
-    return fallback;
+    if (fallback) return fallback;
+    // Safety net: the random ring search came up empty (e.g. the player is
+    // pinned in a corner of the unlocked map). Deterministically take the
+    // nearest unlocked point outside arm's reach, so a wave never silently
+    // fails to place a zombie.
+    let best = null, bestScore = Infinity;
+    for (const p of pts) {
+      if (!this.world.zones.isUnlocked(p.zone)) continue;
+      const d = Math.hypot(p.x - player.position.x, p.z - player.position.z);
+      if (d < 12) continue; // never spawn on top of the player
+      const score = Math.abs(d - 40); // favour the usual spawn ring
+      if (score < bestScore) { bestScore = score; best = p; }
+    }
+    return best;
   }
 
   spawnOne(typeName, player) {
@@ -102,19 +117,21 @@ export class SpawnSystem {
 
   update(dt, player) {
     // stream the wave in
-    if (this.waves.state === 'active' && this.waves.budget > 0 && player.alive) {
+    const cap = this.waves.activeCap();
+    if (this.waves.wantsSpawn() && player.alive) {
       this.spawnTimer -= dt;
-      if (this.spawnTimer <= 0 && this.activeSlots() < ACTIVE_CAP) {
+      if (this.spawnTimer <= 0 && this.activeSlots() < cap) {
         this.spawnTimer = this.waves.spawnInterval();
-        const batch = Math.min(this.waves.budget, 2 + ((Math.random() * 4) | 0));
+        const batch = Math.min(this.waves.toSpawn, this.waves.batchSize());
         for (let i = 0; i < batch; i++) {
-          if (this.activeSlots() >= ACTIVE_CAP) break;
+          if (this.activeSlots() >= cap) break;
           if (this.spawnOne(this.pickType(), player)) this.waves.noteSpawned(1);
         }
       }
     }
 
-    // corpse cleanup
+    // corpse cleanup. A culled zombie was removed without ever being killed, so
+    // refund it to the wave budget — otherwise the kill quota could never be met.
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
       if (z.toRemove) {
@@ -122,6 +139,7 @@ export class SpawnSystem {
         z.dispose();
         this.zombies.splice(i, 1);
         this.waves.noteRemoved(1);
+        if (z.culled) this.waves.refundSpawn(1);
       }
     }
 

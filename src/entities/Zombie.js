@@ -63,6 +63,7 @@ export class Zombie extends Entity {
     this.windup = -1;
     this.deathTimer = 0;
     this.toRemove = false;
+    this.culled = false;
     this.lastSeenPlayer = 0;
     this.blindTimer = 0;      // time since an unobstructed line to the player
     this.knockVX = 0;
@@ -137,6 +138,7 @@ export class Zombie extends Entity {
     if (this.state === 'dead') return;
     this.state = 'dead';
     this.toRemove = true;
+    this.culled = true; // removed without scoring — the spawn director refunds it
     this.events.emit('zombie:culled', { pos: this.position.clone(), type: this.config });
   }
 
