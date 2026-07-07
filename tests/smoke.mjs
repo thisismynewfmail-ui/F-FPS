@@ -371,6 +371,115 @@ check('graphic death FX pools present', fx.deathFx);
 check('run stats are not on the HUD', fx.noHudStats);
 check('pause screen shows circular stat gauges', fx.pauseRings);
 
+// EXPLODER: the Creeper-like suicide bomber. Spawn gate at 120 kills, a paused
+// quarter-second fuse that detonates through the real damage pipeline (hurting
+// the player AND the surrounding horde), a death explosion ~0.5s into the death
+// animation, and sniper-ammo loot ONLY on a player kill. Driven deterministically
+// with the frame loop paused.
+const exp = await page.evaluate(async () => {
+  const g = window.__game;
+  const world = g.world, player = g.player, cam = g.renderer.camera;
+  const groundAt = (x, z) => world.groundHeightFor(x, z, 1e9);
+  const mkCtx = () => ({ player, camPos: cam.position, pathBudget: { n: 4 }, time: g.time,
+    zombies: g.spawner.zombies, friendlies: g.friendlies });
+  const step = (ent, n, dt = 0.05) => { const c = mkCtx(); for (let i = 0; i < n && !ent.toRemove; i++) ent.update(dt, c); };
+  const out = {};
+  g.state.state = 'paused'; // drive by hand
+
+  let sniperDrops = 0, booms = 0;
+  g.events.on('loot:spawn', (e) => { if (e.type === 'ammo_sniper') sniperDrops++; });
+  g.events.on('exploder:explode', () => { booms++; });
+
+  // 1. Spawn gate: no exploders in the table below 120 kills, present at/after.
+  out.gateOff = g.waves.typeWeights().exploder === 0;
+  while (g.score.kills < 121 && !g.score.victory) g.score.registerKill('Walker', 1);
+  out.gateOn = g.waves.typeWeights().exploder > 0;
+
+  // 2. It really is an Exploder, and only slightly faster than the 5.0 walk.
+  player.teleport(0, groundAt(0, 20), 20); player.alive = true;
+  const ex = g.spawner.spawnOne('exploder', player);
+  out.spawned = !!ex && ex.config.name === 'Exploder' && ex.tags.has('exploder') && typeof ex._explode === 'function';
+  out.speedSlightlyAboveWalk = ex.config.chaseSpeed > 5.0 && ex.config.chaseSpeed <= 6.0;
+
+  // 2b. Flanking: dropped exactly on the player's front sightline, just inside
+  // flankRange, it skirts to a side instead of walking straight down the barrel.
+  player.teleport(0, groundAt(0, 20), 20); player.yaw = 0; player.alive = true;
+  const fwdX = -Math.sin(player.yaw), fwdZ = -Math.cos(player.yaw); // player forward
+  const rgtX = Math.cos(player.yaw), rgtZ = -Math.sin(player.yaw);  // player right
+  const exf = g.spawner.spawnOne('exploder', player);
+  exf.placeAt(player.position.x + fwdX * 2.9, player.position.z + fwdZ * 2.9);
+  exf.state = 'chasing'; exf.victim = null; exf._retryCd = 0;
+  let maxLateral = 0;
+  for (let i = 0; i < 24 && exf.state !== 'fuse' && !exf._exploded; i++) {
+    exf.update(0.05, mkCtx());
+    const dx = exf.position.x - player.position.x, dz = exf.position.z - player.position.z;
+    const lateral = Math.abs(dx * rgtX + dz * rgtZ); // offset along the player's right axis
+    if (lateral > maxLateral) maxLateral = lateral;
+  }
+  out.flanks = maxLateral > 0.4;
+
+  // 3. Fuse → it plants itself, primes, then the attack blast hurts the player
+  // AND gibs a neighbouring zombie. It must NOT move while the fuse burns.
+  player.teleport(0, groundAt(0, 20), 20);
+  player.alive = true; player.health = 100; player.invulnTime = 0; player.godMode = false;
+  ex.placeAt(1.2, 20); ex.state = 'idle'; ex.victim = null; ex._retryCd = 0; ex._exploded = false;
+  const bystander = g.spawner.spawnOne('walker', player) || g.spawner.zombies.find((z) => z.state !== 'dead' && z !== ex);
+  bystander.placeAt(2.4, 20); bystander.state = 'idle'; bystander.hp = bystander.config.hp;
+  const hpB = bystander.hp;
+  const boomsBefore = booms;
+  let enteredFuse = false, fusePos = null;
+  for (let i = 0; i < 16 && !ex._exploded; i++) {
+    ex.update(0.05, mkCtx());
+    if (ex.state === 'fuse') { enteredFuse = true; if (!fusePos) fusePos = { x: ex.position.x, z: ex.position.z }; }
+  }
+  out.pausedFuse = enteredFuse;
+  out.heldStillWhileFusing = fusePos ? Math.hypot(ex.position.x - fusePos.x, ex.position.z - fusePos.z) < 0.05 : false;
+  out.exploded = ex._exploded && ex.state === 'dead';
+  out.boomFired = booms === boomsBefore + 1;
+  out.hurtPlayer = player.health < 100;
+  out.gibbedZombie = bystander.state === 'dead' || bystander.hp < hpB;
+
+  // 4. A player kill drops sniper ammo, then it blows up ~0.5s into the death
+  // animation (far from the player so its blast harms nobody).
+  const ex2 = g.spawner.spawnOne('exploder', player);
+  ex2.placeAt(60, 20);
+  const dropsBefore = sniperDrops;
+  ex2.takeDamage(999); // a bullet — byPlayer defaults true
+  out.playerKillDropsAmmo = sniperDrops === dropsBefore + 1;
+  const boomsBefore2 = booms;
+  step(ex2, 16); // run the death anim past deathExplodeDelay (0.5s)
+  out.deathExplodes = ex2._exploded && booms === boomsBefore2 + 1;
+
+  // 5. A self-detonation (attack) drops NO ammo.
+  player.teleport(0, groundAt(0, 20), 20);
+  player.alive = true; player.health = 100; player.invulnTime = 0;
+  const ex3 = g.spawner.spawnOne('exploder', player);
+  ex3.placeAt(1.2, 20); ex3.state = 'idle'; ex3.victim = null; ex3._retryCd = 0;
+  const dropsBefore2 = sniperDrops;
+  for (let i = 0; i < 16 && !ex3._exploded; i++) ex3.update(0.05, mkCtx());
+  out.attackDropsNothing = ex3._exploded && sniperDrops === dropsBefore2;
+
+  // tidy up: clear the field so the win-condition run starts clean
+  for (const z of g.spawner.zombies) z.toRemove = true;
+  player.teleport(0, groundAt(0, 20), 20); player.alive = true; player.health = 100;
+  g.state.state = 'playing';
+  return out;
+});
+check('exploder stays out of the spawn table before 120 kills', exp.gateOff);
+check('exploder joins the spawn table at 120 kills', exp.gateOn);
+check('spawnOne builds a real Exploder', exp.spawned);
+check('exploder speed is only slightly above walking', exp.speedSlightlyAboveWalk);
+check('exploder skirts to a flank instead of charging head-on', exp.flanks);
+check('exploder pauses to prime its fuse', exp.pausedFuse);
+check('exploder cannot move while the fuse burns', exp.heldStillWhileFusing);
+check('exploder detonates and dies from its attack', exp.exploded);
+check('detonation emits one explosion event', exp.boomFired);
+check('explosion damages the player', exp.hurtPlayer);
+check('explosion damages a neighbouring zombie', exp.gibbedZombie);
+check('player kill drops sniper ammo', exp.playerKillDropsAmmo);
+check('killed exploder blows up during its death animation', exp.deathExplodes);
+check('self-detonation as an attack drops no ammo', exp.attackDropsNothing);
+
 // 4 + 5. win condition, exact — via the same registerKill pipeline that
 // 'zombie:death' events call, in batches to keep the page responsive.
 const win = await page.evaluate(async () => {

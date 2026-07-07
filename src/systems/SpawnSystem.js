@@ -1,4 +1,5 @@
 import { Zombie } from '../entities/Zombie.js';
+import { Exploder } from '../entities/Exploder.js';
 import { ZOMBIE_TYPES } from '../entities/ZombieTypes.js';
 import { makeSpriteMaterial } from '../rendering/Billboard.js';
 
@@ -31,12 +32,13 @@ export class SpawnSystem {
       walker: makeSpriteMaterial(texLib.get('zombieBasic')),
       sprinter: makeSpriteMaterial(texLib.tinted('zombieBasic', 'sprinter')),
       tank: makeSpriteMaterial(texLib.tinted('zombieBasic', 'tank')),
+      exploder: makeSpriteMaterial(texLib.get('npcExploder')),
     };
 
     events.on('noise', ({ pos, radius }) => {
       for (const z of this.zombies) z.onNoise(pos, radius);
     });
-    events.on('zombie:death', ({ pos }) => this._maybeDrop(pos));
+    events.on('zombie:death', ({ pos, loot }) => this._maybeDrop(pos, loot));
   }
 
   activeSlots() {
@@ -48,8 +50,10 @@ export class SpawnSystem {
   pickType() {
     const w = this.waves.typeWeights();
     const r = Math.random();
-    if (r < w.tank) return 'tank';
-    if (r < w.tank + w.sprinter) return 'sprinter';
+    let acc = w.tank;
+    if (r < acc) return 'tank';
+    acc += w.sprinter; if (r < acc) return 'sprinter';
+    acc += w.exploder || 0; if (r < acc) return 'exploder';
     return 'walker';
   }
 
@@ -77,7 +81,8 @@ export class SpawnSystem {
   spawnOne(typeName, player) {
     const p = this.pickSpawnPoint(player);
     if (!p) return null;
-    const z = new Zombie(ZOMBIE_TYPES[typeName], this.materials[typeName], this.world, this.events);
+    const Ctor = typeName === 'exploder' ? Exploder : Zombie;
+    const z = new Ctor(ZOMBIE_TYPES[typeName], this.materials[typeName], this.world, this.events);
     z.placeAt(p.x + (Math.random() - 0.5) * 2, p.z + (Math.random() - 0.5) * 2);
     if (this.cullBlindSeconds > 0) z.flags.cullBlindSeconds = this.cullBlindSeconds;
     this.zombies.push(z);
@@ -142,7 +147,15 @@ export class SpawnSystem {
     }
   }
 
-  _maybeDrop(pos) {
+  _maybeDrop(pos, loot) {
+    // Exploders carry an explicit loot decision on their death event: sniper
+    // ammo when the player killed them, an explicit `null` (no drop) when they
+    // self-detonated or died to another blast. Everything else (loot undefined)
+    // rolls the usual random drop.
+    if (loot !== undefined) {
+      if (loot) this.events.emit('loot:spawn', { x: pos.x, z: pos.z, type: loot, amount: 5 });
+      return;
+    }
     const r = Math.random();
     if (r < 0.030) {
       const kinds = ['ammo_rifle', 'ammo_shotgun', 'ammo_rifle', 'ammo_sniper'];

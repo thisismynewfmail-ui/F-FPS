@@ -11,6 +11,9 @@ import { WIN_KILLS } from './ScoreSystem.js';
  * higher share of sprinters and tanks.
  */
 const RESPITE_TIME = 12;
+// Exploders stay out of the mix until the player has this many kills under
+// their belt, then join the spawn table with a modest, slowly-growing share.
+export const EXPLODER_KILL_GATE = 120;
 
 export class WaveSystem {
   constructor(events, score) {
@@ -38,7 +41,11 @@ export class WaveSystem {
   typeWeights() {
     const sprinter = Math.min(0.38, 0.04 + this.wave * 0.012 + this.progress * 0.34);
     const tank = Math.min(0.15, Math.max(0, (this.wave - 3) * 0.008 + this.progress * 0.12));
-    return { walker: 1 - sprinter - tank, sprinter, tank };
+    // Only spawn exploders once past the kill gate; then ramp their share a
+    // little with overall progress.
+    const exploder = this.score.kills >= EXPLODER_KILL_GATE
+      ? Math.min(0.2, 0.07 + this.progress * 0.13) : 0;
+    return { walker: Math.max(0, 1 - sprinter - tank - exploder), sprinter, tank, exploder };
   }
 
   /** Called by the spawn director when it spawns/removes wave zombies. */

@@ -71,6 +71,7 @@ export const TEXTURES = {
 export const SPRITES = {
   npcPeaceful: 'npc_spritesheet_peacefull.png',
   zombieBasic: 'npc_spritesheet_zombie_basic.png',
+  npcExploder: 'npc_exploder.png',
 };
 
 /** Layout of the 3x4 walk-cycle sheets (RPG-Maker style). */
