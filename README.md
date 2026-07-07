@@ -107,6 +107,19 @@ There is deliberately no command that touches the kill counter — the
   stuck behind geometry never stalls a wave. Deaths are graphic: a wide gib
   burst, an additive "digital" spark pop and a glitch-dissolve on the sprite,
   with a matching wet-crunch-plus-bitcrush death sound.
+- **Exploder:** a Creeper-like suicide bomber built on the zombie stack. It
+  chases like a Walker, but once it closes inside a few metres it **stops
+  charging head-on and skirts to a flank**, spiralling up on your side; inside
+  its trigger ring it **plants itself and cannot move while a quarter-second
+  fuse burns**, flashing hot, then detonates. If you back out of range the fuse
+  aborts and it takes a **1-second cooldown** before trying again. It **also
+  explodes ~half a second into its death animation** when killed. The blast runs
+  through the real damage pipeline — it hurts **you**, **chain-detonates other
+  exploders** and can gib the surrounding horde — with a fireball, smoke plume,
+  light pop, screen shake, a death sound *and* an explosion boom. It drops
+  **sniper ammo, but only when the player kills it** (not when it self-detonates
+  as an attack), moves only **slightly faster than your walk**, and starts
+  appearing once you pass **120 kills**.
 - **Friendly NPC:** the survivor by the well runs the same stack — Flee ▸
   Wander ▸ Idle behaviours arbitrated by her Senses. She flees any zombie that
   comes hunting and keeps running until it is out of sight, then returns to
@@ -128,7 +141,8 @@ There is deliberately no command that touches the kill counter — the
   counter. Run stats — accuracy, score, secrets, progress, time — live on the
   **pause screen as circular gauges**, not on the HUD.
 - **Waves:** escalating hordes with respite periods and supply drops;
-  sprinter/tank share rises with wave number and progress toward 250,000.
+  sprinter/tank share rises with wave number and progress toward 250,000, and
+  exploders join the table once you clear 120 kills.
 - **Progression:** six districts unlock at kill milestones — Old Town
   (start), Eastgate Residential (50), Downtown (150), Hollow Park
   (2,500), Southside Industrial (4,500), Chapel Ridge (7,000). Barricades
@@ -148,7 +162,7 @@ lib/three.module.js vendored Three.js r169
 scripts/            generate_textures.mjs — regenerates assets/textures/
 src/engine/         game loop, input, event bus
 src/ai/             sensory system: senses, steering, behaviour arbiter
-src/entities/       player, zombies, NPC, cockroach, pickups
+src/entities/       player, zombies, exploder, NPC, cockroach, pickups
 src/weapons/        weapon configs + firing/ammo/hit resolution
 src/rendering/      renderer, texture pipeline, billboards, HUD, 3D weapon
                     view + PBR weapon materials, effects

@@ -31,6 +31,7 @@ export class AudioManager {
     on('player:heal', () => {});
     on('player:died', () => this.deathSting());
     on('zombie:death', ({ pos }) => this.zombieDeath(pos));
+    on('exploder:explode', ({ pos }) => this.explosion(pos));
     on('zombie:aggro', ({ pos }) => this.growl(pos));
     on('wave:start', () => this.horn());
     on('zone:unlock', () => this.rumble());
@@ -276,6 +277,22 @@ export class AudioManager {
     const steps = [1200, 820, 560, 380, 240];                        // digital glitch
     steps.forEach((f, i) => this._tone('square', f, 0.05, 0.09 * v, 0.05 + i * 0.03, pan, f * 0.6));
     this._noise(0.22, 'bandpass', 3000, 8, 0.05 * v, 0.06, pan, 1100); // ring-mod shimmer
+  }
+
+  /**
+   * Exploder detonation: a deep two-layer body boom with a downward pitch
+   * sweep, a sharp initial crack and a lingering low rumble tail — carried far
+   * (80 m) and spatialised so a blast across the street still reads.
+   */
+  explosion(pos) {
+    const s = this._spatial(pos, 80);
+    if (!s) return;
+    const v = s.vol, pan = s.pan;
+    this._tone('sine', 120, 0.5, 0.55 * v, 0, pan, 30);       // body boom
+    this._tone('sine', 62, 0.75, 0.42 * v, 0, pan, 22);       // sub layer
+    this._noise(0.12, 'lowpass', 2200, 0.8, 0.5 * v, 0, pan, 300); // crack
+    this._noise(0.6, 'lowpass', 700, 0.6, 0.3 * v, 0.05, pan, 120); // rumble tail
+    this._noise(0.35, 'highpass', 3000, 1, 0.16 * v, 0.02, pan);    // debris crackle
   }
 
   moan(pan, vol) {

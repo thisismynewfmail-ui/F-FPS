@@ -64,6 +64,50 @@ class ParticlePool {
   }
 }
 
+/**
+ * A small pool of camera-facing additive quads for one-shot flashes (the
+ * exploder fireball core). Each spawn expands from a bright point and fades,
+ * reading as the sprite being swallowed by the blast.
+ */
+class FlashPool {
+  constructor(scene, texture, count, color) {
+    this.items = [];
+    for (let i = 0; i < count; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: texture, color, transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      this.items.push({ mesh, mat, age: 0, life: 1, size: 1, active: false });
+    }
+    this.cursor = 0;
+  }
+
+  spawn(pos, size, life) {
+    const it = this.items[this.cursor];
+    this.cursor = (this.cursor + 1) % this.items.length;
+    it.active = true; it.age = 0; it.life = life; it.size = size;
+    it.mesh.position.set(pos.x, pos.y, pos.z);
+    it.mesh.visible = true;
+  }
+
+  update(dt, camPos) {
+    for (const it of this.items) {
+      if (!it.active) continue;
+      it.age += dt;
+      const t = it.age / it.life;
+      if (t >= 1) { it.active = false; it.mesh.visible = false; continue; }
+      const s = it.size * (0.4 + t * 1.4);   // expand
+      it.mesh.scale.set(s, s, 1);
+      it.mat.opacity = (1 - t) * (1 - t);     // ease-out fade
+      it.mesh.rotation.y = Math.atan2(camPos.x - it.mesh.position.x, camPos.z - it.mesh.position.z);
+    }
+  }
+}
+
 export class Effects {
   constructor(events, scene, texLib, player) {
     this.events = events;
@@ -76,6 +120,11 @@ export class Effects {
     // burst up and wink out, reading as the sprite breaking into data.
     this.spark = new ParticlePool(scene, texLib.get('muzzleFlash'), 220,
       { size: 0.34, color: 0x7df3d0, gravity: 3, drag: 0.05, blending: THREE.AdditiveBlending });
+    // Exploder blast: a rising orange fireball (negative gravity → lofts up),
+    // a billowing smoke column and a short-lived flash core.
+    this.fire = new ParticlePool(scene, texLib.get('smoke'), 240,
+      { size: 0.7, color: 0xffb050, gravity: -3.5, drag: 0.1, blending: THREE.AdditiveBlending });
+    this.flash = new FlashPool(scene, texLib.get('muzzleFlash'), 6, 0xffa838);
 
     this.shake = 0;
     this.muzzleLight = new THREE.PointLight(0xffc860, 0, 14);
@@ -83,6 +132,9 @@ export class Effects {
     // A short red pop of light at each death, sold alongside the gib burst.
     this.deathLight = new THREE.PointLight(0xff3524, 0, 9);
     scene.add(this.deathLight);
+    // A bigger, warmer flash for exploder detonations.
+    this.explosionLight = new THREE.PointLight(0xffa030, 0, 22);
+    scene.add(this.explosionLight);
 
     events.on('zombie:hit', ({ pos }) => {
       this.blood.spawn({ x: pos.x, y: pos.y + 1.1, z: pos.z }, 7, 3.2, 0.9, 0.7);
@@ -97,6 +149,20 @@ export class Effects {
       this.deathLight.position.set(pos.x, pos.y + 1.1, pos.z);
       this.deathLight.intensity = 14;
       this.addShake(0.03);
+    });
+    events.on('exploder:explode', ({ pos, radius }) => {
+      // A proper fireball: an expanding flash core, a lofting fire burst, a
+      // billowing smoke plume, a warm light pop and screen shake that scales
+      // with how close the player is standing to the blast.
+      const core = { x: pos.x, y: pos.y + 0.9, z: pos.z };
+      this.flash.spawn(core, (radius || 3) * 1.15, 0.42);
+      this.fire.spawn({ x: pos.x, y: pos.y + 0.8, z: pos.z }, 40, 9.0, 1.5, 0.6);
+      this.dust.spawn({ x: pos.x, y: pos.y + 0.5, z: pos.z }, 24, 4.5, 1.2, 1.2);
+      this.blood.spawn({ x: pos.x, y: pos.y + 0.7, z: pos.z }, 14, 6.5, 1.1, 0.7); // gib debris
+      this.explosionLight.position.set(pos.x, pos.y + 1.0, pos.z);
+      this.explosionLight.intensity = 30;
+      const d = Math.hypot(pos.x - this.player.position.x, pos.z - this.player.position.z);
+      this.addShake(Math.max(0, 0.14 * (1 - d / 16)));
     });
     events.on('impact', ({ pos }) => this.dust.spawn(pos, 4, 1.4, 1.4, 0.5));
     events.on('secret:rubble', (pos) => this.dust.spawn(pos, 30, 3, 1.2, 1.2));
@@ -133,12 +199,15 @@ export class Effects {
     };
   }
 
-  update(dt) {
+  update(dt, camPos) {
     this.blood.update(dt);
     this.dust.update(dt);
     this.spark.update(dt);
+    this.fire.update(dt);
+    if (camPos) this.flash.update(dt, camPos);
     this.shake = Math.max(0, this.shake - dt * 0.35);
     this.muzzleLight.intensity = Math.max(0, this.muzzleLight.intensity - dt * 220);
     this.deathLight.intensity = Math.max(0, this.deathLight.intensity - dt * 42);
+    this.explosionLight.intensity = Math.max(0, this.explosionLight.intensity - dt * 60);
   }
 }

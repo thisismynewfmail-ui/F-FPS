@@ -215,7 +215,7 @@ export class Game {
     this.pickups.update(dt, this.time, this.player, cam.position);
     this.world.update(dt, this.time, cam.position);
     this.sky.update(dt, cam.position);
-    this.effects.update(dt);
+    this.effects.update(dt, cam.position);
     this.audio.update(dt, this.player, this.spawner.nearbyCount(this.player));
 
     // camera + first-person layer
