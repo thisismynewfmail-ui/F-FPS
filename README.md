@@ -152,7 +152,9 @@ There is deliberately no command that touches the kill counter — the
 - **Checkpoints & death:** the run is checkpointed every **tenth wave**. When
   you die, every zombie on the map is cleared and the run rolls back to the last
   checkpoint — kills, score and wave all restored — then that wave respawns from
-  scratch (die at wave 45 → back to 40).
+  scratch (die at wave 45 → back to 40). The district barriers re-seal to match
+  the rolled-back kill count, so any sections you'd opened stand again and must
+  be re-earned.
 - **Progression:** six districts unlock at kill milestones — Old Town
   (start), Eastgate Residential (50), Downtown (150), Hollow Park
   (2,500), Southside Industrial (4,500), Chapel Ridge (7,000). Barricades

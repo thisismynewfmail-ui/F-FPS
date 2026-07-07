@@ -154,6 +154,9 @@ export class Game {
     const cp = this.checkpoint;
     for (const z of this.spawner.zombies) z.toRemove = true;
     this.score.restore(cp.score);
+    // Re-seal the districts that the rolled-back kill count no longer clears, so
+    // the section walls stand again (and reopen as the player re-earns them).
+    this.world.zones.syncTo(cp.score.kills);
     this.waves.restartAtWave(Math.max(1, cp.wave));
     this.player.respawn();
     this.hud.showScreen(null);
