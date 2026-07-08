@@ -10,7 +10,7 @@ export const ZOMBIE_TYPES = {
     name: 'Walker',
     hp: 30,
     points: 1,
-    damage: 8,
+    damage: 10,          // melee hit (separate from the flat 5 contact damage)
     reach: 1.7,
     wanderSpeed: 0.8,
     chaseSpeed: 2.1,
