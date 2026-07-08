@@ -45,6 +45,31 @@ export class ScoreSystem {
     return this.shotsFired === 0 ? 0 : this.shotsHit / this.shotsFired;
   }
 
+  /**
+   * Freeze the run-progress counters so a checkpoint can roll them back on
+   * death. The survival clock (timePlayed) is deliberately left out — it is a
+   * cumulative record across attempts, not a per-run stat to rewind.
+   */
+  snapshot() {
+    return {
+      kills: this.kills,
+      points: this.points,
+      byType: { ...this.byType },
+      shotsFired: this.shotsFired,
+      shotsHit: this.shotsHit,
+    };
+  }
+
+  /** Restore counters captured by snapshot() (used by the checkpoint system). */
+  restore(snap) {
+    if (!snap) return;
+    this.kills = snap.kills;
+    this.points = snap.points;
+    this.byType = { ...snap.byType };
+    this.shotsFired = snap.shotsFired;
+    this.shotsHit = snap.shotsHit;
+  }
+
   tick(dt) {
     if (!this.victory) this.timePlayed += dt;
   }

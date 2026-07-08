@@ -48,6 +48,9 @@ export class Game {
     this.world.secrets.attach(this);
     this.score = new ScoreSystem(this.events);
     this.waves = new WaveSystem(this.events, this.score);
+    // Checkpoint: the run-state to roll back to on death. Refreshed every tenth
+    // wave (see _wire); the initial one is the pristine start (wave 0, no kills).
+    this.checkpoint = { wave: 0, score: this.score.snapshot() };
     this.spawner = new SpawnSystem(this.events, this.world, this.texLib, this.renderer.scene, this.waves);
     // Actively add the blind-cull flag (a tag/flag, not baked-in behaviour):
     // any zombie that can't get an unobstructed line to the player for 30s is
@@ -109,6 +112,11 @@ export class Game {
       }
     });
 
+    // Checkpoint every tenth wave: snapshot the run so a death rolls back to it.
+    this.events.on('wave:start', ({ wave }) => {
+      if (wave % 10 === 0) this.checkpoint = { wave, score: this.score.snapshot() };
+    });
+
     this.events.on('player:died', () => {
       if (!this.state.to('dead')) return;
       this.hud.fillDeadStats(this.score.stats());
@@ -140,8 +148,16 @@ export class Game {
 
   respawn() {
     if (!this.state.to('playing')) return;
-    // The fog resets: clear the field so the crawl back out is survivable.
+    // Roll the run back to the last checkpoint (every tenth wave). Every zombie
+    // on the map dies, the stats and wave restore to the checkpoint, and that
+    // wave respawns from scratch — e.g. dying at wave 45 drops you back to 40.
+    const cp = this.checkpoint;
     for (const z of this.spawner.zombies) z.toRemove = true;
+    this.score.restore(cp.score);
+    // Re-seal the districts that the rolled-back kill count no longer clears, so
+    // the section walls stand again (and reopen as the player re-earns them).
+    this.world.zones.syncTo(cp.score.kills);
+    this.waves.restartAtWave(Math.max(1, cp.wave));
     this.player.respawn();
     this.hud.showScreen(null);
     if (!this.testMode) this.input.requestPointerLock();

@@ -38,6 +38,12 @@ export class CollisionWorld {
     if (box) box.active = false;
   }
 
+  /** Re-activate a box previously turned off with remove() (same id + bounds). */
+  restore(id) {
+    const box = this.boxes.find((b) => b.id === id);
+    if (box) box.active = true;
+  }
+
   _candidates(minX, minZ, maxX, maxZ, out) {
     out.length = 0;
     const seen = new Set();

@@ -47,9 +47,10 @@ export class Zones {
     this.events = events;
     this.collision = collision;
     this.nav = nav;
+    this.scene = scene;
     this.unlocked = new Set([0]);
     this.sinking = [];
-    this.barriers = new Map(); // zoneId -> [{group, colliderIds, navRect}]
+    this.barriers = new Map(); // zoneId -> [{group, colliderId, navRect, upY}]
 
     for (const seg of SEGMENTS) {
       const len = Math.hypot(seg.x2 - seg.x1, seg.z2 - seg.z1);
@@ -66,7 +67,7 @@ export class Zones {
       const colliderId = collision.addBox(mx - hx, y - 1, mz - hz, mx + hx, y + 3.4, mz + hz, 'barrier');
       nav.blockBox(mx - hx, mz - hz, mx + hx, mz + hz);
       if (!this.barriers.has(seg.zone)) this.barriers.set(seg.zone, []);
-      this.barriers.get(seg.zone).push({ group: g, colliderId, navRect: [mx - hx, mz - hz, mx + hx, mz + hz] });
+      this.barriers.get(seg.zone).push({ group: g, colliderId, navRect: [mx - hx, mz - hz, mx + hx, mz + hz], upY: g.position.y });
     }
 
     events.on('kill', ({ total }) => this.checkUnlocks(total));
@@ -89,6 +90,43 @@ export class Zones {
     }
     const zone = ZONES[zoneId];
     this.events.emit('zone:unlock', { zone });
+  }
+
+  /**
+   * Re-seal a district: raise its barriers back up, restore their colliders and
+   * nav blocks. The inverse of unlock(), used when a death rolls the run back to
+   * a checkpoint whose kill count no longer clears this zone's threshold.
+   */
+  relock(zoneId) {
+    if (zoneId === 0 || !this.unlocked.has(zoneId)) return; // zone 0 is always open
+    this.unlocked.delete(zoneId);
+    for (const b of this.barriers.get(zoneId) ?? []) {
+      // cancel any in-flight sink animation for this barrier
+      const si = this.sinking.findIndex((s) => s.group === b.group);
+      if (si >= 0) this.sinking.splice(si, 1);
+      // raise it back into place (re-adding it to the scene if it fully sank)
+      b.group.position.y = b.upY;
+      b.group.rotation.z = 0;
+      if (!b.group.parent) this.scene.add(b.group);
+      // restore the collider + nav block it had while sealed
+      this.collision.restore(b.colliderId);
+      this.nav.blockBox(...b.navRect);
+    }
+    this.events.emit('zone:lock', { zone: ZONES[zoneId] });
+  }
+
+  /**
+   * Force the whole barrier state to match a kill count — unlocking districts
+   * at/above their threshold and re-sealing those above it. Called on respawn so
+   * the walls reflect the checkpoint the run rolled back to.
+   */
+  syncTo(totalKills) {
+    for (const z of ZONES) {
+      if (z.id === 0) continue;
+      const shouldOpen = totalKills >= z.kills;
+      if (shouldOpen && !this.unlocked.has(z.id)) this.unlock(z.id);
+      else if (!shouldOpen && this.unlocked.has(z.id)) this.relock(z.id);
+    }
   }
 
   update(dt) {
