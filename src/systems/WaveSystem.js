@@ -26,6 +26,9 @@ const HEAT_SPAN = 3000;         // kills over which heat climbs 0 → 1 past the
 // Exploders stay out of the mix until the player has this many kills under
 // their belt, then join the spawn table with a modest, slowly-growing share.
 export const EXPLODER_KILL_GATE = 120;
+// The opening waves stream a small surplus over the quota so the early field
+// feels a touch busier — a few bodies still standing when the wave clears.
+const EARLY_WAVES = 5;
 
 export class WaveSystem {
   constructor(events, score) {
@@ -96,7 +99,11 @@ export class WaveSystem {
     this.wave++;
     this.quota = this.waveQuota(this.wave);
     this.killsThisWave = 0;
-    this.toSpawn = this.quota;
+    // Opening waves stream 2–4 more bodies than the quota strictly needs, so a
+    // few zombies are still standing when the wave clears. The quota (kills to
+    // advance) is unchanged — only the surplus on the field grows.
+    const surplus = this.wave <= EARLY_WAVES ? 2 + ((Math.random() * 3) | 0) : 0;
+    this.toSpawn = this.quota + surplus;
     this.aliveFromWave = 0;
     this.state = 'active';
     this.events.emit('wave:start', { wave: this.wave, size: this.quota });
