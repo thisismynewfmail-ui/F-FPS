@@ -226,10 +226,10 @@ export class WeaponView {
 
     // --- reload ---
     if (weapon.reloading) {
-      const f = 1 - weapon.reloadLeft / weapon.config.reloadTime;
+      const f = 1 - weapon.reloadLeft / weapon.reloadDuration;
       const env = f < 0.15 ? f / 0.15 : f > 0.8 ? (1 - f) / 0.2 : 1;
       py -= env * 0.07; rx -= env * 0.18; rz += env * 0.14; pz += env * 0.05;
-      rig.reload(f, rig.parts);
+      rig.reload(f, rig.parts, weapon.tactical);
     } else if (rig.parts.mag) {
       rig.parts.mag.visible = true; // ensure restored
     }

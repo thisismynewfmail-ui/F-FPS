@@ -21,6 +21,7 @@ export const WEAPON_CONFIGS = [
     id: 'pistol',
     name: 'PISTOL',
     flavor: 'REGENT AUTOLOADER',
+    tacticalReload: 0.72, // quick-tap when the mag isn't empty
     slot: 1,
     melee: false,
     damage: 12,
@@ -45,7 +46,7 @@ export const WEAPON_CONFIGS = [
   {
     id: 'shotgun',
     name: 'SHOTGUN',
-    flavor: 'COACH BREAKER',
+    flavor: 'PARISH BLUNDERBUSS',
     slot: 2,
     melee: false,
     damage: 8,
@@ -65,13 +66,14 @@ export const WEAPON_CONFIGS = [
     zoom: null,
     sound: 'shotgun',
     ammoType: 'ammo_shotgun',
-    altLabel: 'BOTH BARRELS',
+    altLabel: 'DOUBLE LOAD',
     alt: { mode: 'double', shells: 2, pellets: 16, fireInterval: 1.15, spread: 8.5, kickMul: 1.7, knockbackMul: 1.6, sound: 'shotgunDouble', noise: 68 },
   },
   {
     id: 'rifle',
     name: 'ASSAULT RIFLE',
-    flavor: 'AUTOMATON REPEATER',
+    flavor: 'FOUNDRY GUN',
+    tacticalReload: 0.75,
     slot: 3,
     melee: false,
     damage: 10,
@@ -97,7 +99,7 @@ export const WEAPON_CONFIGS = [
   {
     id: 'sniper',
     name: 'SNIPER RIFLE',
-    flavor: 'RANGEFINDER',
+    flavor: 'OBSERVATORY RIFLE',
     slot: 4,
     melee: false,
     damage: 90,
@@ -122,7 +124,7 @@ export const WEAPON_CONFIGS = [
   {
     id: 'bat',
     name: 'BASEBALL BAT',
-    flavor: 'PISTON BAT',
+    flavor: 'IRONSHOD SLUGGER',
     slot: 5,
     melee: true,
     damage: 34,
