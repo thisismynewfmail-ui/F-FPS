@@ -105,7 +105,7 @@ html, body {
 .wm-title { font-size: 10px; letter-spacing: 5px; color: #8a9478; }
 .wm-slots { display: flex; gap: 6px; }
 .wm-slot {
-  width: 96px; padding: 7px 4px 5px; position: relative;
+  width: 104px; padding: 7px 4px 5px; position: relative;
   background: rgba(8, 10, 8, 0.6); border: 2px solid #3a4232;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
@@ -114,7 +114,10 @@ html, body {
 .wm-slot.active .wm-key { color: #e0b840; }
 .wm-glyph { width: 64px; height: 34px; opacity: 0.85; }
 .wm-slot.dry .wm-glyph { filter: grayscale(1) brightness(0.5); }
-.wm-name { font-size: 10px; letter-spacing: 1px; color: #c8d0b8; text-align: center; white-space: nowrap; }
+.wm-name {
+  font-size: 9px; letter-spacing: 0.5px; color: #c8d0b8; text-align: center;
+  white-space: nowrap; max-width: 100%; overflow: hidden;
+}
 .wm-slot.active .wm-name { color: #e0b840; }
 .wm-ammo { font-size: 11px; color: #a8b098; letter-spacing: 1px; }
 .wm-slot.dry .wm-ammo { color: #b03030; }

@@ -11,6 +11,8 @@ export class Weapon {
     this.cooldown = 0;
     this.reloading = false;
     this.reloadLeft = 0;
+    this.reloadDuration = config.reloadTime ?? 1; // length of the current reload
+    this.tactical = false;                        // quick-tap (mag not empty) variant
     this.bloom = 0;
   }
 
@@ -52,7 +54,12 @@ export class Weapon {
   startReload() {
     if (!this.canReload()) return false;
     this.reloading = true;
-    this.reloadLeft = this.config.reloadTime;
+    // Quick-tap reload: weapons that retain a chambered round (config sets
+    // tacticalReload < 1) reload faster when the magazine isn't empty and the
+    // rig skips its slide-release phase.
+    this.tactical = this.mag > 0 && !!this.config.tacticalReload;
+    this.reloadDuration = this.config.reloadTime * (this.tactical ? this.config.tacticalReload : 1);
+    this.reloadLeft = this.reloadDuration;
     return true;
   }
 

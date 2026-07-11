@@ -18,7 +18,9 @@ const TYPES = {
   key: { tex: 'key', tint: null, label: 'Rusty key' },
 };
 const PICKUP_RADIUS = 1.3;
-const MAX_PICKUPS = 90;
+// Interior furniture (drawers, cabinets, lockers) registers many more loot
+// points than the old one-per-building world, so the cap is higher.
+const MAX_PICKUPS = 140;
 
 export class PickupManager {
   constructor(events, world, texLib, scene) {

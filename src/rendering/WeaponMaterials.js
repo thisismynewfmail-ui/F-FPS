@@ -143,11 +143,20 @@ function buildMaps(cfg) {
     const f = sampleField((x + 0.5) / A, (y + 0.5) / A, cfg);
     H[i] = f.h;
     const shade = 0.72 + f.h * 0.5;            // height → lambert-ish shading baked faint
-    const grime = 1 - f.wear * cfg.grimeAmt;
     const eg = f.edge * cfg.edgeBright;
-    ad[i * 4]     = Math.min(255, br * shade * grime + eg * 120);
-    ad[i * 4 + 1] = Math.min(255, bg * shade * grime + eg * 120);
-    ad[i * 4 + 2] = Math.min(255, bb * shade * grime + eg * 120);
+    let cr = br * shade, cg = bg * shade, cb = bb * shade;
+    if (cfg.wearTint) {
+      // wear shifts toward a tint color (verdigris on old bronze) instead of
+      // plain darkening
+      const t = f.wear * cfg.grimeAmt;
+      cr = mix(cr, cfg.wearTint[0], t); cg = mix(cg, cfg.wearTint[1], t); cb = mix(cb, cfg.wearTint[2], t);
+    } else {
+      const grime = 1 - f.wear * cfg.grimeAmt;
+      cr *= grime; cg *= grime; cb *= grime;
+    }
+    ad[i * 4]     = Math.min(255, cr + eg * 120);
+    ad[i * 4 + 1] = Math.min(255, cg + eg * 120);
+    ad[i * 4 + 2] = Math.min(255, cb + eg * 120);
     ad[i * 4 + 3] = 255;
   }
   albedo.getContext('2d').putImageData(aImg, 0, 0);
@@ -224,6 +233,14 @@ const PALETTES = {
   oak:        P({ seed: 42, color: [128, 88, 46], style: 'wood', metal: 0, rough: 0.58, normalStr: 1.6, grimeAmt: 0.5 }),
   leather:    P({ seed: 51, color: [74, 46, 28], style: 'leather', metal: 0, rough: 0.72, normalStr: 2.2, cell: 10, grimeAmt: 0.55 }),
   canvas:     P({ seed: 61, color: [104, 92, 60], style: 'canvas', metal: 0, rough: 0.86, normalStr: 1.5, weave: 26, grimeAmt: 0.5 }),
+  // --- the 2nd-generation weapon families (one signature set per weapon) ---
+  nickel:       P({ seed: 71, color: [186, 190, 198], aSize: 1024, normalStr: 1.8, rough: 0.16, wear: 0.22, grainU: 4, grainV: 70, polish: 1.5, edgeBright: 0.8 }),
+  blackSteel:   P({ seed: 72, color: [32, 34, 38], aSize: 1024, normalStr: 2.2, rough: 0.5, wear: 0.55, grainU: 5, grainV: 40, panels: 6, rivets: 6, edgeBright: 1.4 }),
+  bronzePatina: P({ seed: 73, color: [128, 106, 58], rough: 0.52, wear: 0.9, grainV: 24, rivets: 5, grimeAmt: 0.6, edgeBright: 1.0, wearTint: [88, 134, 110] }),
+  hammeredIron: P({ seed: 74, color: [54, 52, 54], rough: 0.6, wear: 0.7, grain: 2.4, grainU: 12, grainV: 12, edgeBright: 0.9 }),
+  ivory:        P({ seed: 75, color: [216, 204, 178], style: 'wood', metal: 0, rough: 0.3, normalStr: 0.8, grimeAmt: 0.35 }),
+  ebony:        P({ seed: 76, color: [40, 32, 28], style: 'wood', metal: 0, rough: 0.4, normalStr: 1.4, grimeAmt: 0.3 }),
+  cherry:       P({ seed: 77, color: [116, 54, 36], style: 'wood', metal: 0, rough: 0.5, normalStr: 1.6, grimeAmt: 0.45 }),
 };
 
 /* ---------------- public API ---------------- */

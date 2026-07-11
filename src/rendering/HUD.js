@@ -6,8 +6,10 @@ import { WIN_KILLS } from '../systems/ScoreSystem.js';
  *
  * Always visible: segmented health bar (bottom-left), ammo mag/reserve
  * (bottom-right), kill counter vs 250,000 with victory progress bar
- * (top-center), weapon bar with icons (bottom-center), wave + zone
- * (top-left), accuracy/points/secrets (top-right). Plus subtitles, pickup
+ * (top-center), wave + zone (top-left). The weapon menu is HIDDEN by
+ * default: it fades in at top-center (0.15 s ease-in-out) when a slot key
+ * or the mouse wheel is used, auto-hides after 2.5 s of no input (0.2 s
+ * fade), and dismisses immediately on fire/reload. Plus subtitles, pickup
  * feed, damage vignette, scope overlay, and the menu/death/victory screens.
  */
 export class HUD {
@@ -188,11 +190,32 @@ export class HUD {
     ctx.lineWidth = 2; ctx.lineJoin = 'round';
     const p = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); };
     switch (id) {
-      case 'pistol': p([[8, 8], [40, 8], [40, 15], [22, 15], [22, 30], [14, 30], [14, 15], [8, 15]]); break;
-      case 'shotgun': ctx.fillRect(6, 10, 44, 4); ctx.fillRect(6, 15, 44, 4); ctx.fillRect(44, 9, 12, 14); break;
-      case 'rifle': ctx.fillRect(8, 11, 40, 7); ctx.fillRect(44, 13, 12, 3); ctx.fillRect(20, 18, 8, 12); ctx.fillRect(10, 18, 6, 8); break;
-      case 'sniper': ctx.fillRect(6, 13, 50, 4); ctx.fillRect(22, 7, 18, 4); ctx.fillRect(50, 12, 8, 6); break;
-      case 'bat': ctx.beginPath(); ctx.moveTo(8, 20); ctx.lineTo(40, 12); ctx.lineTo(56, 12); ctx.lineTo(56, 20); ctx.lineTo(40, 20); ctx.closePath(); ctx.fill(); break;
+      case 'pistol': // slim autoloader with a ventilated sight rib
+        p([[6, 10], [42, 10], [42, 16], [22, 16], [22, 30], [14, 30], [14, 16], [6, 16]]);
+        for (let x = 8; x < 40; x += 8) ctx.fillRect(x, 6, 5, 2);
+        break;
+      case 'shotgun': // under-lever gun with a flared bell muzzle
+        ctx.fillRect(14, 12, 34, 5);
+        p([[4, 8], [14, 11], [14, 18], [4, 21]]);               // bell flare
+        ctx.fillRect(46, 10, 12, 12);                           // stock
+        ctx.strokeRect(38, 19, 9, 8);                           // lever loop
+        break;
+      case 'rifle': // jacketed machine gun with a carry handle
+        ctx.fillRect(6, 12, 44, 7);
+        for (let x = 9; x < 30; x += 6) ctx.clearRect(x, 14, 3, 3); // jacket vents
+        ctx.fillRect(34, 6, 12, 3); ctx.fillRect(34, 8, 2, 5); ctx.fillRect(44, 8, 2, 5); // handle
+        ctx.fillRect(50, 13, 8, 5); ctx.fillRect(38, 19, 6, 10);
+        break;
+      case 'sniper': // very long octagonal barrel + scope tube
+        ctx.fillRect(4, 15, 52, 3);
+        ctx.fillRect(26, 8, 22, 4);                             // telescope
+        ctx.fillRect(24, 9, 3, 6); ctx.fillRect(46, 9, 3, 6);   // mounts
+        p([[50, 14], [58, 14], [58, 24], [52, 24]]);            // skeleton stock
+        break;
+      case 'bat': // studded club
+        p([[8, 19], [40, 11], [54, 11], [54, 21], [40, 21]]);
+        ctx.clearRect(44, 14, 2, 2); ctx.clearRect(49, 14, 2, 2); // stud dots
+        break;
       default: ctx.fillRect(10, 12, 40, 8);
     }
   }

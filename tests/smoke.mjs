@@ -70,14 +70,57 @@ await page.click('#btn-start');
 await page.waitForFunction(() => window.__game.state.state === 'playing');
 check('state reaches playing', true);
 
-// player movement
+// player movement (a long hold: software-rendered CI frames are slow)
 const before = await page.evaluate(() => ({ ...window.__game.player.position }));
 await page.keyboard.down('w');
-await page.waitForTimeout(700);
+await page.waitForTimeout(1500);
 await page.keyboard.up('w');
 const after = await page.evaluate(() => ({ ...window.__game.player.position }));
 const moved = Math.hypot(after.x - before.x, after.z - before.z);
 check('WASD moves the player', moved > 1, `moved ${moved.toFixed(2)}m`);
+
+// BUILDING & STRUCTURE OVERHAUL: urban-planning ratios, adjacent-texture
+// variety, the maintenance gradient, furnished interiors and infrastructure.
+const town = await page.evaluate(() => {
+  const w = window.__game.world;
+  const specs = w.buildingSpecs;
+  const c = (re) => specs.filter((s) => re.test(s.name)).length;
+  let adjacentSame = 0;
+  for (let i = 0; i < specs.length; i++) {
+    for (let j = i + 1; j < specs.length; j++) {
+      const a = specs[i], b = specs[j];
+      const gap = Math.max(Math.abs(a.x - b.x) - (a.w + b.w) / 2, Math.abs(a.z - b.z) - (a.d + b.d) / 2);
+      if (gap < 6 && a.wall === b.wall) adjacentSame++;
+    }
+  }
+  const avgDer = (pred) => {
+    const l = specs.filter(pred);
+    return l.reduce((s, x) => s + x.derelict, 0) / l.length;
+  };
+  return {
+    total: specs.length,
+    libraries: c(/^library$/),
+    churches: c(/church|chapel/),
+    gas: c(/^gas/),
+    houses: c(/house|cottage|lodge/),
+    adjacentSame,
+    coreDerelict: avgDer((s) => Math.hypot(s.x, s.z) < 60),
+    rimDerelict: avgDer((s) => Math.hypot(s.x, s.z) > 180),
+    interiors: w.interiors.populated.length,
+    enterable: specs.filter((s) => !s.solid).length,
+    lootPoints: w.lootPoints.length,
+  };
+});
+check('exactly one library in town', town.libraries === 1, `${town.libraries}`);
+check('at most two churches', town.churches >= 1 && town.churches <= 2, `${town.churches}`);
+check('three to five gas stations', town.gas >= 3 && town.gas <= 5, `${town.gas}`);
+check('dozens of residential houses', town.houses >= 24, `${town.houses}`);
+check('no adjacent buildings share a wall texture', town.adjacentSame === 0, `${town.adjacentSame} clashes`);
+check('town core better maintained than the outskirts', town.coreDerelict < town.rimDerelict - 0.1,
+  `core ${town.coreDerelict.toFixed(2)} vs rim ${town.rimDerelict.toFixed(2)}`);
+check('every enterable building has a furnished interior', town.interiors === town.enterable,
+  `${town.interiors}/${town.enterable}`);
+check('interior loot points registered', town.lootPoints > 100, `${town.lootPoints}`);
 
 // zombies spawn once wave 1 starts (grace period is ~5s)
 await page.waitForFunction(() => window.__game.spawner.zombies.length > 0, null, { timeout: 25000 });

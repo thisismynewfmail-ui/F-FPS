@@ -73,9 +73,10 @@ export class WeaponManager {
       this.events.emit('weapon:menu:poke', { index: this.index });
     }
 
-    // reload
+    // reload (full, or the faster quick-tap variant when the mag isn't dry)
     if (input.wasPressed('KeyR') && this.current.startReload()) {
-      this.events.emit('weapon:reload:start', { weapon: this.current });
+      const w = this.current;
+      this.events.emit('weapon:reload:start', { weapon: w, tactical: w.tactical, duration: w.reloadDuration });
     }
 
     const cfg = this.current.config;
@@ -122,7 +123,7 @@ export class WeaponManager {
     const shells = a?.shells ?? 1;
     if (!w.isMelee && w.mag < shells) {
       this.events.emit('weapon:empty', { weapon: w });
-      if (w.startReload()) this.events.emit('weapon:reload:start', { weapon: w });
+      if (w.startReload()) this.events.emit('weapon:reload:start', { weapon: w, tactical: w.tactical, duration: w.reloadDuration });
       return false;
     }
     const interval = opts.interval ?? a?.fireInterval ?? w.config.fireInterval;
