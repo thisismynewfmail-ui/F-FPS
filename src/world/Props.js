@@ -1,5 +1,5 @@
 import * as THREE from '../../lib/three.module.js';
-import { scaleBoxUVs } from './Buildings.js';
+import { mergeStatic, scaleBoxUVs } from './Buildings.js';
 
 /**
  * Environmental props: wrecked cars, street furniture, debris, barriers.
@@ -154,36 +154,208 @@ export class PropKit {
     return { group: g, collide: [0.9, 1.0, 0.9] };
   }
 
-  /** Long low debris wall used for zone frontiers. len along X before yaw. */
-  rubbleWall(len, height = 2.6) {
-    const g = new THREE.Group();
-    const core = this.box(len, height, 1.6, 'rubble');
-    core.position.y = height / 2 - 0.2;
-    g.add(core);
-    const rng = seeded(len * 7 + height * 13);
-    for (let i = 0; i < len / 2; i++) {
-      const chunk = this.box(1 + rng() * 1.5, 0.5 + rng(), 1 + rng(), 'rubble');
-      chunk.position.set((rng() - 0.5) * len, height - 0.4 + rng() * 0.4, (rng() - 0.5) * 1.4);
-      chunk.rotation.y = rng() * 1.5;
-      g.add(chunk);
-    }
-    return { group: g }; // caller registers collider (needs removal id)
+  /* ---- mosque-style zone borders --------------------------------------
+   * Tall white-marble walls with arcaded niches, dense gold-tipped merlon
+   * rows, onion-dome features, corner turrets, and (for gates) a pointed
+   * portal arch sealed by a golden screen, flanked by minarets. Built from
+   * segment endpoints so every module roots to the terrain under it; the
+   * whole group is merged so a border costs a handful of draw calls.
+   * Callers register the movement collider (needs a removal id).         */
+
+  /** Gold onion dome with drum, tip spike and crescent finial. */
+  _onionDome(parent, x, y, z, r = 1) {
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.82, r * 0.95, r * 0.8, 8), this.mat('marbleWhite'));
+    drum.position.set(x, y + r * 0.4, z);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), this.mat('goldMetal'));
+    dome.scale.y = 1.15;
+    dome.position.set(x, y + r * 1.3, z);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(r * 0.2, r * 0.85, 6), this.mat('goldMetal'));
+    tip.position.set(x, y + r * 2.55, z);
+    const crescent = new THREE.Mesh(new THREE.TorusGeometry(r * 0.22, r * 0.05, 5, 8, Math.PI * 1.4), this.mat('goldMetal'));
+    crescent.position.set(x, y + r * 3.05, z);
+    crescent.rotation.z = Math.PI * 0.55;
+    parent.add(drum, dome, tip, crescent);
   }
 
-  /** Striped barricade gate segment for unlockable openings. */
-  barricadeGate(len) {
-    const g = new THREE.Group();
-    const board = this.box(len, 1.1, 0.25, 'barricade');
-    board.position.y = 1.0;
-    const board2 = this.box(len, 1.1, 0.25, 'barricade');
-    board2.position.y = 2.05;
-    board2.rotation.z = 0.03;
-    g.add(board, board2);
-    for (let x = -len / 2 + 0.5; x <= len / 2 - 0.5; x += 2) {
-      const post = this.box(0.22, 2.6, 0.22, 'wallWood');
-      post.position.set(x, 1.3, 0);
-      g.add(post);
+  /** Square wall turret capping a border segment's ends. */
+  _wallTurret(parent, h) {
+    const shaft = this.box(1.6, h + 3, 2.3, 'marbleWhite');
+    shaft.position.y = (h + 3) / 2 - 3; // rooted 3 m into the ground
+    const band = this.box(1.8, 0.32, 2.5, 'goldMetal');
+    band.position.y = h - 0.45;
+    parent.add(shaft, band);
+    this._onionDome(parent, 0, h, 0, 0.62);
+  }
+
+  /** Gate minaret: tiered white shaft, gold balcony, dome + crescent. */
+  _minaret(parent) {
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.95, 12, 8), this.mat('marbleWhite'));
+    shaft.position.y = 3.5; // base sunk 2.5 m
+    const balcony = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.85, 0.55, 8), this.mat('goldMetal'));
+    balcony.position.y = 9.2;
+    const parapet = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 8), this.mat('marbleWhite'));
+    parapet.position.y = 9.7;
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.58, 2.6, 8), this.mat('marbleWhite'));
+    upper.position.y = 11.1;
+    parent.add(shaft, balcony, parapet, upper);
+    this._onionDome(parent, 0, 12.3, 0, 0.68);
+  }
+
+  /** One wall module: plinth, arcaded body, cornice, merlons + a feature. */
+  _mosqueModule(m, mlen, H, rng, feature) {
+    const plinth = this.box(mlen + 0.02, 3.2, 2.1, 'marbleWhite');
+    plinth.position.y = -1.3; // roots the module into sloped ground
+    const body = this.box(mlen + 0.02, H, 1.5, 'marbleWhite');
+    body.position.y = H / 2;
+    const cornice = this.box(mlen + 0.06, 0.45, 1.9, 'marbleWhite');
+    cornice.position.y = H + 0.22;
+    const trim = this.box(mlen + 0.1, 0.16, 1.95, 'goldMetal');
+    trim.position.y = H - 0.14;
+    m.add(plinth, body, cornice, trim);
+    // pointed-arch niches on both faces
+    const arches = Math.max(1, Math.floor(mlen / 2.1));
+    for (let a = 0; a < arches; a++) {
+      const ax = ((a + 0.5) / arches - 0.5) * (mlen - 1.2);
+      for (const s of [-1, 1]) {
+        const q = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 3.9), this.mat('archNiche'));
+        q.position.set(ax, 2.4, s * 0.78);
+        if (s < 0) q.rotation.y = Math.PI;
+        m.add(q);
+      }
     }
+    // dense row of pointed merlons along the parapet
+    const crenels = Math.max(2, Math.round(mlen / 1.1));
+    for (let c = 0; c < crenels; c++) {
+      const cx = ((c + 0.5) / crenels - 0.5) * mlen;
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.26, 1.0, 4), this.mat('marbleWhite'));
+      spike.position.set(cx, H + 0.9, 0);
+      spike.rotation.y = Math.PI / 4;
+      m.add(spike);
+    }
+    if (feature === 'dome') {
+      this._onionDome(m, 0, H + 0.42, 0, 0.9);
+    } else if (feature === 'spire') {
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.36, 2.3, 4), this.mat('marbleWhite'));
+      sp.position.y = H + 1.55;
+      sp.rotation.y = Math.PI / 4;
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), this.mat('goldMetal'));
+      ball.position.y = H + 2.85;
+      m.add(sp, ball);
+    }
+  }
+
+  /** Terrain-following row of wall modules; skips a bay around gapT. */
+  _mosqueRun(g, x1, z1, x2, z2, gapT = null, gapHalf = 0) {
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    const baseY = this.terrain.heightAt((x1 + x2) / 2, (z1 + z2) / 2);
+    const rng = seeded(x1 * 13 + z1 * 7 + x2 * 3 + z2 * 17);
+    const n = Math.max(1, Math.round(len / 6));
+    const mlen = len / n;
+    const H = 6.0;
+    const features = ['spire', 'plain', 'dome', 'plain'];
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) * mlen - len / 2;
+      if (gapT !== null && Math.abs(t - gapT) < gapHalf) continue;
+      const f = (t + len / 2) / len;
+      const wy = this.terrain.heightAt(x1 + (x2 - x1) * f, z1 + (z2 - z1) * f);
+      const m = new THREE.Group();
+      m.position.set(t, wy - baseY, 0);
+      g.add(m);
+      this._mosqueModule(m, mlen, H, rng, features[Math.floor(rng() * features.length)]);
+    }
+    // corner turrets root the ends
+    for (const s of [-1, 1]) {
+      const f = s < 0 ? 0.01 : 0.99;
+      const wy = this.terrain.heightAt(x1 + (x2 - x1) * f, z1 + (z2 - z1) * f);
+      const tw = new THREE.Group();
+      tw.position.set(s * (len / 2 - 0.7), wy - baseY, 0);
+      this._wallTurret(tw, H + 0.9);
+      g.add(tw);
+    }
+    return { len, baseY, H };
+  }
+
+  /** Solid border wall for a zone frontier. len along X before yaw. */
+  mosqueWall(x1, z1, x2, z2) {
+    const g = new THREE.Group();
+    this._mosqueRun(g, x1, z1, x2, z2);
+    mergeStatic(g);
+    return { group: g };
+  }
+
+  /**
+   * Gate segment: the wall parts around a grand pointed portal (sealed by a
+   * golden screen) flanked by two minarets. portalT positions the portal
+   * along the segment (0..1) so it lines up with the road it guards.
+   */
+  mosqueGate(x1, z1, x2, z2, portalT = 0.5) {
+    const g = new THREE.Group();
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    const pT = (portalT - 0.5) * len;
+    const { baseY, H } = this._mosqueRun(g, x1, z1, x2, z2, pT, 7.2);
+    const wyP = this.terrain.heightAt(x1 + (x2 - x1) * portalT, z1 + (z2 - z1) * portalT);
+    const portal = new THREE.Group();
+    portal.position.set(pT, wyP - baseY, 0);
+    g.add(portal);
+    // piers, rooted deep
+    for (const s of [-1, 1]) {
+      const pier = this.box(1.3, 10.7, 2.3, 'marbleWhite');
+      pier.position.set(s * 3.0, 2.85, 0); // -2.5 .. 8.2
+      const cap = this.box(1.45, 0.3, 2.45, 'goldMetal');
+      cap.position.set(s * 3.0, 7.7, 0);
+      portal.add(pier, cap);
+      for (const q of [-1, 1]) { // arch faces on the piers
+        const niche = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.6), this.mat('archNiche'));
+        niche.position.set(s * 3.0, 2.1, q * 1.16);
+        if (q < 0) niche.rotation.y = Math.PI;
+        portal.add(niche);
+      }
+    }
+    // stepped pointed arch closing the opening
+    const opening = 4.7; // between pier inner faces
+    for (let step = 0; step < 4; step++) {
+      const y = 5.4 + step * 0.75;
+      const gap = Math.max(0, opening - (step + 1) * 1.35);
+      const reach = (opening - gap) / 2;
+      if (gap < 0.3) {
+        const lintel = this.box(opening + 0.2, 0.75, 2.2, 'marbleWhite');
+        lintel.position.set(0, y + 0.37, 0);
+        portal.add(lintel);
+      } else {
+        for (const s of [-1, 1]) {
+          const corbel = this.box(reach, 0.75, 2.2, 'marbleWhite');
+          corbel.position.set(s * (opening / 2 - reach / 2), y + 0.37, 0);
+          portal.add(corbel);
+        }
+      }
+    }
+    // pediment, gold trim, merlons and the crowning dome
+    const pediment = this.box(7.6, 1.3, 2.4, 'marbleWhite');
+    pediment.position.y = 8.85;
+    const trim = this.box(7.7, 0.18, 2.5, 'goldMetal');
+    trim.position.y = 9.6;
+    portal.add(pediment, trim);
+    for (const s of [-2.6, -1.3, 1.3, 2.6]) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.9, 4), this.mat('marbleWhite'));
+      spike.position.set(s, 10.0, 0);
+      spike.rotation.y = Math.PI / 4;
+      portal.add(spike);
+    }
+    this._onionDome(portal, 0, 9.5, 0, 1.25);
+    // golden screen seals the archway until the district opens
+    const screen = this.box(4.9, 5.3, 0.22, 'goldScreen');
+    screen.position.y = 2.65;
+    portal.add(screen);
+    // flanking minarets
+    for (const s of [-1, 1]) {
+      const f = Math.min(0.99, Math.max(0.01, portalT + (s * 5.9) / len));
+      const wy = this.terrain.heightAt(x1 + (x2 - x1) * f, z1 + (z2 - z1) * f);
+      const mn = new THREE.Group();
+      mn.position.set(pT + s * 5.9, wy - baseY, 0);
+      this._minaret(mn);
+      g.add(mn);
+    }
+    mergeStatic(g);
     return { group: g };
   }
 

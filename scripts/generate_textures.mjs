@@ -486,6 +486,77 @@ brickWall('wall_brick_tan.png',
   save('wall_stone.png', img);
 }
 
+{ // white marble (mosque-style border walls): ivory tiles, faint veining
+  const img = new Img(128, 128);
+  const pal = [[212, 208, 196], [224, 220, 208], [234, 230, 219], [243, 240, 230]];
+  noiseFill(img, pal, 3101, { baseCell: 34, ditherAmp: 0.1, curve: (v) => 0.35 + v * 0.6 });
+  const rng = mulberry32(3102);
+  for (let i = 0; i < 5; i++) crack(img, rng, [196, 192, 180], 26); // soft veins
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    if (x % 32 === 0 || y % 32 === 0) img.set(x, y, [186, 182, 170]); // tile joints
+  }
+  save('wall_marble.png', img);
+}
+
+{ // polished gold (domes, trims, finials): banded metallic shine
+  const img = new Img(64, 64);
+  const pal = [[122, 84, 26], [164, 116, 34], [204, 152, 44], [236, 190, 64], [250, 220, 116]];
+  const n = makeNoise(64, 16, 3103);
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+    let v = 0.55 + Math.sin(y * Math.PI / 16 + n(x, y) * 2.2) * 0.34;
+    img.set(x, y, pick(pal, dither(v, x, y, 0.14)));
+  }
+  const rng = mulberry32(3104);
+  for (let i = 0; i < 14; i++) img.set(Math.floor(rng() * 64), Math.floor(rng() * 64), [255, 242, 178]); // glints
+  save('gold.png', img);
+}
+
+{ // pointed-arch niche panel (one arch per quad, marble field + gold outline)
+  const img = new Img(64, 128);
+  const pal = [[212, 208, 196], [224, 220, 208], [234, 230, 219], [243, 240, 230]];
+  noiseFill(img, pal, 3105, { baseCell: 24, ditherAmp: 0.1, curve: (v) => 0.35 + v * 0.6 });
+  img.rectC(0, 0, 64, 3, [176, 172, 160]); img.rectC(0, 125, 64, 3, [176, 172, 160]);
+  img.rectC(0, 0, 3, 128, [176, 172, 160]); img.rectC(61, 0, 3, 128, [176, 172, 160]);
+  const apexY = 18, springY = 58, halfW = 19, cx = 32;
+  const widthAt = (y) => {
+    if (y >= springY) return halfW;
+    const t = (y - apexY) / (springY - apexY);
+    return t <= 0 ? 0 : halfW * Math.sin(t * Math.PI / 2); // pointed ogee-ish curve
+  };
+  for (let y = apexY; y < 122; y++) {
+    const w = widthAt(y);
+    for (let x = Math.ceil(cx - w); x <= Math.floor(cx + w); x++) {
+      const depth = 0.5 + (y / 128) * 0.3; // recess darkens upward
+      const shade = dither(depth, x, y, 0.2);
+      img.set(x, y, pick([[26, 30, 40], [34, 40, 52], [44, 52, 66]], 1 - shade));
+    }
+    // gold arch outline
+    for (const s of [-1, 1]) {
+      const gx = Math.round(cx + s * w);
+      img.set(gx, y, [204, 152, 44]);
+      img.set(gx + s, y, [164, 116, 34]);
+    }
+  }
+  img.rectC(cx - halfW - 2, 120, halfW * 2 + 5, 3, [204, 152, 44]); // gold sill
+  save('arch_niche.png', img);
+}
+
+{ // golden gate screen: vertical bars + rails over darkness
+  const img = new Img(64, 64);
+  const goldPal = [[164, 116, 34], [204, 152, 44], [236, 190, 64]];
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+    const bar = x % 8 < 3;
+    const rail = y % 32 < 3;
+    if (bar || rail) {
+      let v = 0.5 + Math.sin((bar ? x % 8 : y % 32) * 1.2) * 0.3;
+      img.set(x, y, pick(goldPal, dither(v, x, y, 0.16)));
+    } else {
+      img.set(x, y, dither(0.5, x, y, 0.3) > 0.5 ? [22, 20, 18] : [30, 27, 24]);
+    }
+  }
+  save('gold_screen.png', img);
+}
+
 /* ------------------------------------------------------------------ */
 /* Doors / windows / roofs / floors                                    */
 /* ------------------------------------------------------------------ */

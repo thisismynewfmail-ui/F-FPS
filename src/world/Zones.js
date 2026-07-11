@@ -4,10 +4,12 @@ import * as THREE from '../../lib/three.module.js';
  * Progressive zone unlock system.
  *
  * The town is divided into six districts radiating from Old Town Square.
- * Each locked district is sealed behind debris walls and striped barricades
- * placed across streets. When the cumulative kill count reaches a district's
- * threshold, its barriers rumble and sink into the ground — the world tells
- * the story, no popup. Colliders and nav blocks are removed at the same time.
+ * Each locked district is sealed behind towering mosque-style border walls —
+ * white marble arcades crowned with gold-tipped merlons, onion domes and
+ * minarets — with a golden-screened portal arch where each road crosses.
+ * When the cumulative kill count reaches a district's threshold, its walls
+ * rumble and sink into the ground — the world tells the story, no popup.
+ * Colliders and nav blocks are removed at the same time.
  */
 export const ZONES = [
   { id: 0, name: 'Old Town Square', kills: 0, rect: { minX: -45, maxX: 45, minZ: -45, maxZ: 45 } },
@@ -19,8 +21,9 @@ export const ZONES = [
 ];
 
 // Axis-aligned barrier segments. `zone` = zone whose unlock clears them.
-// `gate: true` renders the striped barricade (the "door" the world opens);
-// others are collapsed-rubble walls.
+// `gate: true` builds the portal-arch wall (the "door" the world opens) with
+// its archway aligned to the road via `portal` (0..1 along the segment);
+// others are solid border walls.
 const SEGMENTS = [
   { zone: 1, x1: 45, z1: -45, x2: 45, z2: 45, gate: true },      // Main St East
   { zone: 2, x1: -45, z1: -45, x2: 45, z2: -45, gate: true },    // North Ave
@@ -29,7 +32,7 @@ const SEGMENTS = [
   { zone: 2, x1: 45, z1: -110, x2: 240, z2: -110 },
   { zone: 4, x1: 45, z1: 110, x2: 240, z2: 110 },
   { zone: 3, x1: -140, z1: -140, x2: -140, z2: -45 },
-  { zone: 5, x1: -140, z1: -245, x2: -140, z2: -140, gate: true }, // Ridge Rd
+  { zone: 5, x1: -140, z1: -245, x2: -140, z2: -140, gate: true, portal: 0.667 }, // Ridge Rd
   { zone: 5, x1: -245, z1: -140, x2: -140, z2: -140 },
   { zone: 4, x1: -245, z1: 110, x2: -45, z2: 110 },
   { zone: 3, x1: -140, z1: -45, x2: -45, z2: -45 },
@@ -39,8 +42,10 @@ const SEGMENTS = [
   { zone: 3, x1: -45, z1: -110, x2: -45, z2: -45 },
 ];
 
-const SINK_DEPTH = 4.5;
-const SINK_TIME = 3.0;
+// Deep enough to swallow the minarets and portal domes completely before the
+// group is removed, so nothing pops out of existence above ground.
+const SINK_DEPTH = 16;
+const SINK_TIME = 3.5;
 
 export class Zones {
   constructor(events, propKit, collision, nav, terrain, scene) {
@@ -56,7 +61,9 @@ export class Zones {
       const len = Math.hypot(seg.x2 - seg.x1, seg.z2 - seg.z1);
       const mx = (seg.x1 + seg.x2) / 2, mz = (seg.z1 + seg.z2) / 2;
       const yaw = Math.atan2(-(seg.z2 - seg.z1), seg.x2 - seg.x1);
-      const g = (seg.gate ? propKit.barricadeGate(len) : propKit.rubbleWall(len, 2.8 + (seg.zone % 3) * 0.4)).group;
+      const g = (seg.gate
+        ? propKit.mosqueGate(seg.x1, seg.z1, seg.x2, seg.z2, seg.portal ?? 0.5)
+        : propKit.mosqueWall(seg.x1, seg.z1, seg.x2, seg.z2)).group;
       propKit.place(g, mx, mz, { yaw });
       scene.add(g);
 
@@ -64,7 +71,7 @@ export class Zones {
       const hx = alongX ? len / 2 : 1.2;
       const hz = alongX ? 1.2 : len / 2;
       const y = terrain.heightAt(mx, mz);
-      const colliderId = collision.addBox(mx - hx, y - 1, mz - hz, mx + hx, y + 3.4, mz + hz, 'barrier');
+      const colliderId = collision.addBox(mx - hx, y - 1, mz - hz, mx + hx, y + 6.2, mz + hz, 'barrier');
       nav.blockBox(mx - hx, mz - hz, mx + hx, mz + hz);
       if (!this.barriers.has(seg.zone)) this.barriers.set(seg.zone, []);
       this.barriers.get(seg.zone).push({ group: g, colliderId, navRect: [mx - hx, mz - hz, mx + hx, mz + hz], upY: g.position.y });
