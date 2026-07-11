@@ -239,8 +239,9 @@ export class World {
     // road, central and reachable from every district.
     S({ x: -75, z: -57, w: 14, d: 9, h: 6, wall: 'brickTan', roof: 'flat', floor: 'floorTile', door: 'N', doorTex: 'doorShop', name: 'townHall', use: 'townhall', zone: 2 });
     S({ x: -25, z: -57, w: 11, d: 8, h: 5, wall: 'wallPlaster', roof: 'flat', floor: 'floorTile', door: 'N', name: 'clinic', use: 'clinic', zone: 2 });
-    // School east of the grid, on the extended z=-120 road, yard behind it.
-    S({ x: 58, z: -104, w: 15, d: 11, h: 6, wall: 'brickTan', roof: 'flat', floor: 'floorTile', door: 'S', name: 'school', use: 'school', zone: 2 });
+    // School east of the grid, on the extended z=-120 road, yard behind it
+    // (kept clear of the zone-1 border wall running along z=-110).
+    S({ x: 58, z: -102, w: 15, d: 11, h: 6, wall: 'brickTan', roof: 'flat', floor: 'floorTile', door: 'S', name: 'school', use: 'school', zone: 2 });
     // Third gas station serving the south end of the grid.
     S({ x: 34, z: -227, w: 7, d: 6, h: 3.6, wall: 'wallConcrete', roof: 'shed', roofTex: 'roofMetal', floor: 'floorTile', door: 'N', doorTex: 'doorShop', name: 'gasDowntown', use: 'gasShop', zone: 2 });
     // Downtown infill: extra buildings inside the blocks (clear of streets
@@ -250,7 +251,7 @@ export class World {
       [-88, -108, 9, 8, 8, 'brickTan'], [-12, -108, 8, 8, 7, 'wallPlaster'],
       [-60, -158, 8, 8, 9, 'wallConcrete'], [-38, -130, 8, 8, 8, 'brickGray'],
       [-134, -110, 8, 8, 12, 'stuccoTan'], [34, -128, 8, 8, 9, 'brickGray'],
-      [-136, -178, 8, 8, 8, 'brickRed'], [-10, -180, 8, 8, 10, 'wallConcrete'],
+      [-132, -160, 8, 8, 8, 'brickRed'], [-10, -180, 8, 8, 10, 'wallConcrete'],
     ];
     let fi = 0;
     for (const [bx, bz, w, d, h, wall] of infill) {

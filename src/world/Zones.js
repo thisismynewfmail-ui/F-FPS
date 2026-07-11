@@ -44,7 +44,7 @@ const SEGMENTS = [
 
 // Deep enough to swallow the minarets and portal domes completely before the
 // group is removed, so nothing pops out of existence above ground.
-const SINK_DEPTH = 16;
+const SINK_DEPTH = 20;
 const SINK_TIME = 3.5;
 
 export class Zones {

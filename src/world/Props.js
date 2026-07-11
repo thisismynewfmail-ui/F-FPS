@@ -187,18 +187,20 @@ export class PropKit {
     this._onionDome(parent, 0, h, 0, 0.62);
   }
 
-  /** Gate minaret: tiered white shaft, gold balcony, dome + crescent. */
+  /** Gate minaret: pedestal, tiered white shaft, gold balcony, dome. */
   _minaret(parent) {
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.95, 12, 8), this.mat('marbleWhite'));
-    shaft.position.y = 3.5; // base sunk 2.5 m
-    const balcony = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.85, 0.55, 8), this.mat('goldMetal'));
-    balcony.position.y = 9.2;
-    const parapet = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.5, 8), this.mat('marbleWhite'));
-    parapet.position.y = 9.7;
-    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.58, 2.6, 8), this.mat('marbleWhite'));
-    upper.position.y = 11.1;
-    parent.add(shaft, balcony, parapet, upper);
-    this._onionDome(parent, 0, 12.3, 0, 0.68);
+    const pedestal = this.box(2.6, 5, 2.6, 'marbleWhite');
+    pedestal.position.y = -0.5; // rooted 3 m, 2 m visible plinth
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.1, 12.5, 8), this.mat('marbleWhite'));
+    shaft.position.y = 8.0;
+    const balcony = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.0, 0.6, 8), this.mat('goldMetal'));
+    balcony.position.y = 11.6;
+    const parapet = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.55, 8), this.mat('marbleWhite'));
+    parapet.position.y = 12.15;
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.68, 3.0, 8), this.mat('marbleWhite'));
+    upper.position.y = 13.9;
+    parent.add(pedestal, shaft, balcony, parapet, upper);
+    this._onionDome(parent, 0, 15.3, 0, 0.78);
   }
 
   /** One wall module: plinth, arcaded body, cornice, merlons + a feature. */
@@ -211,7 +213,9 @@ export class PropKit {
     cornice.position.y = H + 0.22;
     const trim = this.box(mlen + 0.1, 0.16, 1.95, 'goldMetal');
     trim.position.y = H - 0.14;
-    m.add(plinth, body, cornice, trim);
+    const band = this.box(mlen + 0.06, 0.14, 1.6, 'goldMetal'); // dado course
+    band.position.y = 0.42;
+    m.add(plinth, body, cornice, trim, band);
     // pointed-arch niches on both faces
     const arches = Math.max(1, Math.floor(mlen / 2.1));
     for (let a = 0; a < arches; a++) {
@@ -244,8 +248,11 @@ export class PropKit {
     }
   }
 
-  /** Terrain-following row of wall modules; skips a bay around gapT. */
-  _mosqueRun(g, x1, z1, x2, z2, gapT = null, gapHalf = 0) {
+  /** Terrain-following, seamless row of wall modules. Modules always tile
+   *  the full length — a border never has a hole in it; a portal overlays
+   *  the wall instead. Features go 'plain' near plainT so nothing pokes
+   *  through a gate's pediment. */
+  _mosqueRun(g, x1, z1, x2, z2, plainT = null, plainHalf = 0) {
     const len = Math.hypot(x2 - x1, z2 - z1);
     const baseY = this.terrain.heightAt((x1 + x2) / 2, (z1 + z2) / 2);
     const rng = seeded(x1 * 13 + z1 * 7 + x2 * 3 + z2 * 17);
@@ -255,13 +262,14 @@ export class PropKit {
     const features = ['spire', 'plain', 'dome', 'plain'];
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) * mlen - len / 2;
-      if (gapT !== null && Math.abs(t - gapT) < gapHalf) continue;
       const f = (t + len / 2) / len;
       const wy = this.terrain.heightAt(x1 + (x2 - x1) * f, z1 + (z2 - z1) * f);
       const m = new THREE.Group();
       m.position.set(t, wy - baseY, 0);
       g.add(m);
-      this._mosqueModule(m, mlen, H, rng, features[Math.floor(rng() * features.length)]);
+      const pick = features[Math.floor(rng() * features.length)];
+      const plain = plainT !== null && Math.abs(t - plainT) < plainHalf;
+      this._mosqueModule(m, mlen, H, rng, plain ? 'plain' : pick);
     }
     // corner turrets root the ends
     for (const s of [-1, 1]) {
@@ -284,74 +292,85 @@ export class PropKit {
   }
 
   /**
-   * Gate segment: the wall parts around a grand pointed portal (sealed by a
-   * golden screen) flanked by two minarets. portalT positions the portal
-   * along the segment (0..1) so it lines up with the road it guards.
+   * Gate segment: the wall runs unbroken and a grand sealed portal overlays
+   * it — piers, stepped pointed arch over a solid tympanum, golden lattice
+   * screen through the full wall depth, domed pediment, and two flanking
+   * minarets. No opening anywhere: the border reads as a gate but stands
+   * shut until the district unlocks and the whole thing sinks. portalT
+   * positions the portal along the segment (0..1) to line up with its road.
    */
   mosqueGate(x1, z1, x2, z2, portalT = 0.5) {
     const g = new THREE.Group();
     const len = Math.hypot(x2 - x1, z2 - z1);
     const pT = (portalT - 0.5) * len;
-    const { baseY, H } = this._mosqueRun(g, x1, z1, x2, z2, pT, 7.2);
+    const { baseY } = this._mosqueRun(g, x1, z1, x2, z2, pT, 8);
     const wyP = this.terrain.heightAt(x1 + (x2 - x1) * portalT, z1 + (z2 - z1) * portalT);
     const portal = new THREE.Group();
     portal.position.set(pT, wyP - baseY, 0);
     g.add(portal);
     // piers, rooted deep
     for (const s of [-1, 1]) {
-      const pier = this.box(1.3, 10.7, 2.3, 'marbleWhite');
-      pier.position.set(s * 3.0, 2.85, 0); // -2.5 .. 8.2
-      const cap = this.box(1.45, 0.3, 2.45, 'goldMetal');
-      cap.position.set(s * 3.0, 7.7, 0);
+      const pier = this.box(1.4, 12.2, 2.6, 'marbleWhite');
+      pier.position.set(s * 3.2, 3.6, 0); // -2.5 .. 9.7
+      const cap = this.box(1.55, 0.32, 2.75, 'goldMetal');
+      cap.position.set(s * 3.2, 9.0, 0);
       portal.add(pier, cap);
       for (const q of [-1, 1]) { // arch faces on the piers
-        const niche = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.6), this.mat('archNiche'));
-        niche.position.set(s * 3.0, 2.1, q * 1.16);
+        const niche = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.8), this.mat('archNiche'));
+        niche.position.set(s * 3.2, 2.3, q * 1.31);
         if (q < 0) niche.rotation.y = Math.PI;
         portal.add(niche);
       }
     }
-    // stepped pointed arch closing the opening
-    const opening = 4.7; // between pier inner faces
-    for (let step = 0; step < 4; step++) {
-      const y = 5.4 + step * 0.75;
-      const gap = Math.max(0, opening - (step + 1) * 1.35);
+    // golden screen seals the archway through the full wall depth
+    const screen = this.box(5.0, 5.75, 1.9, 'goldScreen');
+    screen.position.y = 2.87;
+    portal.add(screen);
+    // solid tympanum backing the arch head — no sky through the gate
+    const tympanum = this.box(5.0, 2.35, 1.7, 'marbleWhite');
+    tympanum.position.y = 6.88;
+    const medallion = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 1.86, 8), this.mat('goldMetal'));
+    medallion.rotation.x = Math.PI / 2;
+    medallion.position.y = 6.88;
+    portal.add(tympanum, medallion);
+    // stepped pointed-arch relief over the tympanum
+    const opening = 5.0; // between pier inner faces
+    for (let step = 0; step < 3; step++) {
+      const y = 5.75 + step * 0.75;
+      const gap = Math.max(0, opening - (step + 1) * 1.9);
       const reach = (opening - gap) / 2;
       if (gap < 0.3) {
-        const lintel = this.box(opening + 0.2, 0.75, 2.2, 'marbleWhite');
+        const lintel = this.box(opening + 0.2, 0.75, 2.6, 'marbleWhite');
         lintel.position.set(0, y + 0.37, 0);
         portal.add(lintel);
       } else {
         for (const s of [-1, 1]) {
-          const corbel = this.box(reach, 0.75, 2.2, 'marbleWhite');
+          const corbel = this.box(reach, 0.75, 2.6, 'marbleWhite');
           corbel.position.set(s * (opening / 2 - reach / 2), y + 0.37, 0);
           portal.add(corbel);
         }
       }
     }
-    // pediment, gold trim, merlons and the crowning dome
-    const pediment = this.box(7.6, 1.3, 2.4, 'marbleWhite');
-    pediment.position.y = 8.85;
-    const trim = this.box(7.7, 0.18, 2.5, 'goldMetal');
-    trim.position.y = 9.6;
+    // pediment, gold trim, merlon row, side domes and the crowning dome
+    const pediment = this.box(8.6, 1.5, 2.7, 'marbleWhite');
+    pediment.position.y = 10.15;
+    const trim = this.box(8.7, 0.2, 2.8, 'goldMetal');
+    trim.position.y = 10.98;
     portal.add(pediment, trim);
-    for (const s of [-2.6, -1.3, 1.3, 2.6]) {
+    for (const s of [-2.4, -1.2, 1.2, 2.4]) {
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.9, 4), this.mat('marbleWhite'));
-      spike.position.set(s, 10.0, 0);
+      spike.position.set(s, 11.4, 0);
       spike.rotation.y = Math.PI / 4;
       portal.add(spike);
     }
-    this._onionDome(portal, 0, 9.5, 0, 1.25);
-    // golden screen seals the archway until the district opens
-    const screen = this.box(4.9, 5.3, 0.22, 'goldScreen');
-    screen.position.y = 2.65;
-    portal.add(screen);
-    // flanking minarets
+    this._onionDome(portal, 0, 10.9, 0, 1.45);
+    for (const s of [-1, 1]) this._onionDome(portal, s * 3.5, 10.9, 0, 0.62);
+    // flanking minarets (the unbroken wall passes behind their pedestals)
     for (const s of [-1, 1]) {
-      const f = Math.min(0.99, Math.max(0.01, portalT + (s * 5.9) / len));
+      const f = Math.min(0.99, Math.max(0.01, portalT + (s * 6.6) / len));
       const wy = this.terrain.heightAt(x1 + (x2 - x1) * f, z1 + (z2 - z1) * f);
       const mn = new THREE.Group();
-      mn.position.set(pT + s * 5.9, wy - baseY, 0);
+      mn.position.set(pT + s * 6.6, wy - baseY, 0);
       this._minaret(mn);
       g.add(mn);
     }
