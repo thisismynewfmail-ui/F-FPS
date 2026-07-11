@@ -405,6 +405,87 @@ brickWall('wall_brick_gray.png',
   save('wall_metal.png', img);
 }
 
+{ // heavily rusted corrugated metal (end-of-the-line industrial decay)
+  const img = new Img(128, 128);
+  const pal = [[60, 62, 66], [72, 74, 78], [86, 88, 92]];
+  const rust = makeNoise(128, 20, 1005);
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    let v = 0.5 + Math.sin(x * Math.PI / 8) * 0.3;
+    let c = pick(pal, dither(v, x, y, 0.1));
+    const r = rust(x, y);
+    if (r > 0.74) c = [92, 52, 32];
+    else if (r > 0.58) c = [110, 72, 46];
+    img.set(x, y, c);
+  }
+  const rng = mulberry32(1006);
+  for (let i = 0; i < 28; i++) { // rust drips bleeding down from seams
+    const x = Math.floor(rng() * 128), y0 = Math.floor(rng() * 128), len = 8 + rng() * 28;
+    for (let t = 0; t < len; t++) img.set(x + ((t & 2) ? 1 : 0), y0 + t, [102, 62, 38]);
+  }
+  save('wall_metal_rust_heavy.png', img);
+}
+
+function sidingWall(name, pal, seed) {
+  // Horizontal clapboard siding: 8 px boards, shadowed lower edges, lit tops.
+  const img = new Img(128, 128);
+  const n = makeNoise(128, 10, seed);
+  const tone = mulberry32(seed + 3);
+  const tones = [];
+  for (let r = 0; r < 16; r++) tones.push((tone() - 0.5) * 0.18);
+  for (let y = 0; y < 128; y++) {
+    const row = Math.floor(y / 8);
+    for (let x = 0; x < 128; x++) {
+      let v = 0.45 + tones[row] + n(x, row * 8) * 0.25;
+      if (y % 8 === 7) v = 0.06;
+      else if (y % 8 === 0) v = Math.min(0.95, v + 0.16);
+      img.set(x, y, pick(pal, dither(v, x, y, 0.12)));
+    }
+  }
+  const rng = mulberry32(seed + 9);
+  for (let row = 0; row < 16; row++) { // board-end seams
+    const sx = Math.floor(rng() * 128);
+    for (let y = row * 8; y < row * 8 + 7; y++) img.set(sx, y, pal[0]);
+  }
+  save(name, img);
+}
+sidingWall('wall_siding_blue.png', [[44, 58, 72], [58, 74, 88], [72, 90, 104], [86, 106, 120]], 3001);
+sidingWall('wall_siding_green.png', [[46, 64, 44], [60, 80, 54], [74, 96, 66], [90, 112, 78]], 3002);
+
+{ // tan stucco (sun-faded render)
+  const img = new Img(128, 128);
+  const pal = [[166, 146, 110], [180, 160, 122], [194, 174, 134], [206, 186, 146]];
+  noiseFill(img, pal, 3003, { baseCell: 30, ditherAmp: 0.18 });
+  const rng = mulberry32(3004);
+  for (let i = 0; i < 4; i++) crack(img, rng, [126, 108, 80], 30);
+  save('wall_stucco_tan.png', img);
+}
+
+brickWall('wall_brick_tan.png',
+  [[148, 122, 86], [164, 138, 98], [178, 152, 110], [192, 166, 122]], [166, 156, 140], 3005);
+
+{ // coursed stone blocks (church / civic buildings)
+  const img = new Img(128, 128);
+  const pal = [[88, 86, 80], [102, 100, 92], [116, 114, 104], [130, 128, 116]];
+  const mortar = [64, 62, 58];
+  const rng = mulberry32(3006);
+  const rowH = 32;
+  for (let row = 0; row < 4; row++) {
+    let bx = Math.floor(rng() * 24);
+    const end = bx + 128;
+    while (bx < end) {
+      const wdt = 24 + Math.floor(rng() * 20);
+      const toneShift = (rng() - 0.5) * 0.3;
+      for (let y = 0; y < rowH; y++) for (let i = 0; i < wdt; i++) {
+        const px = bx + i, py = row * rowH + y;
+        if (y >= rowH - 3 || i >= wdt - 3) { img.set(px, py, mortar); continue; }
+        img.set(px, py, pick(pal, dither(0.5 + toneShift + (rng() - 0.5) * 0.08, px, py, 0.18)));
+      }
+      bx += wdt;
+    }
+  }
+  save('wall_stone.png', img);
+}
+
 /* ------------------------------------------------------------------ */
 /* Doors / windows / roofs / floors                                    */
 /* ------------------------------------------------------------------ */
@@ -459,6 +540,55 @@ function windowTex(name, broken, seed) {
 windowTex('window.png', false, 1201);
 windowTex('window_broken.png', true, 1202);
 
+{ // boarded-up window (derelict outskirts)
+  const img = new Img(64, 64);
+  img.rect(0, 0, 64, 64, [52, 42, 32]);
+  img.rectC(4, 4, 56, 56, [14, 16, 20]);
+  const wood = [[90, 66, 40], [104, 78, 48], [118, 90, 56]];
+  for (const [y0, slope] of [[10, 0.22], [30, -0.18], [48, 0.2]]) {
+    for (let x = 2; x < 62; x++) {
+      const yy = Math.round(y0 + (x - 32) * slope);
+      for (let t = 0; t < 9; t++) {
+        const py = yy + t;
+        if (py < 2 || py > 61) continue;
+        const shade = t === 0 ? 0.85 : t >= 7 ? 0.15 : 0.5;
+        img.set(x, py, pick(wood, dither(shade, x, py, 0.15)));
+      }
+    }
+  }
+  for (const [nx, ny] of [[6, 14], [56, 10], [8, 32], [54, 28], [6, 50], [56, 46]]) img.set(nx, ny, [40, 30, 20]);
+  save('window_boarded.png', img);
+}
+
+{ // wide storefront window with display silhouettes
+  const img = new Img(128, 64);
+  img.rect(0, 0, 128, 64, [46, 44, 46]);
+  for (let y = 3; y < 53; y++) for (let x = 3; x < 125; x++) {
+    let v = 0.22 + (x + y * 2) / 420;
+    if (((x - y) % 34 + 34) % 34 < 5) v += 0.22; // diagonal glints
+    img.set(x, y, pick([[24, 32, 46], [32, 42, 58], [42, 54, 72], [56, 70, 88]], dither(v, x, y, 0.12)));
+  }
+  for (const [bx, bw, bh] of [[18, 14, 20], [52, 18, 26], [92, 12, 16]]) {
+    img.rectC(bx, 53 - bh, bw, bh - 3, [12, 16, 22]); // goods left on display
+  }
+  img.rectC(0, 53, 128, 11, [58, 54, 50]);            // bulkhead / sill
+  img.rectC(62, 3, 4, 50, [46, 44, 46]);              // center mullion
+  save('window_shop.png', img);
+}
+
+{ // glass commercial door
+  const img = new Img(64, 128);
+  img.rect(0, 0, 64, 128, [50, 52, 56]);
+  for (let y = 6; y < 122; y++) for (let x = 6; x < 58; x++) {
+    let v = 0.24 + (x + y) / 300;
+    if (((x - y) % 40 + 40) % 40 < 5) v += 0.2;
+    img.set(x, y, pick([[24, 32, 46], [32, 42, 58], [44, 56, 74], [58, 72, 90]], dither(v, x, y, 0.12)));
+  }
+  img.rectC(6, 60, 52, 5, [64, 66, 70]);   // push bar
+  img.rectC(6, 102, 52, 20, [40, 42, 46]); // kick plate
+  save('door_shop.png', img);
+}
+
 { // shingle roof
   const img = new Img(128, 128);
   const pal = [[52, 40, 40], [64, 50, 48], [76, 60, 56], [88, 70, 64]];
@@ -489,6 +619,39 @@ windowTex('window_broken.png', true, 1202);
     img.set(x, y, c);
   }
   save('roof_metal.png', img);
+}
+
+{ // slate shingle roof (colder palette than the asphalt shingles)
+  const img = new Img(128, 128);
+  const pal = [[38, 44, 52], [48, 56, 64], [58, 68, 76], [70, 80, 88]];
+  const rng = mulberry32(1405);
+  for (let row = 0; row < 8; row++) {
+    const off = row % 2 ? 16 : 0;
+    for (let col = -1; col < 5; col++) {
+      const jitter = (rng() - 0.5) * 0.3;
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
+        const px = col * 32 + off + x, py = row * 16 + y;
+        let v = 0.55 + jitter - (y / 16) * 0.35;
+        if (y >= 14 || x >= 30) v = 0.05;
+        img.set(px, py, pick(pal, dither(v, px, py, 0.16)));
+      }
+    }
+  }
+  save('roof_slate.png', img);
+}
+
+{ // flat tar-and-gravel roof (downtown commercial blocks)
+  const img = new Img(128, 128);
+  const pal = [[36, 36, 38], [44, 44, 46], [52, 52, 54], [60, 60, 62]];
+  noiseFill(img, pal, 1407, { baseCell: 18, ditherAmp: 0.2 });
+  const rng = mulberry32(1408);
+  for (let i = 0; i < 240; i++) { // gravel flecks
+    img.set(Math.floor(rng() * 128), Math.floor(rng() * 128), rng() > 0.5 ? [86, 84, 80] : [72, 70, 66]);
+  }
+  for (const yy of [22, 86]) { // tar seam lines
+    for (let x = 0; x < 128; x++) img.set(x, yy + Math.round(Math.sin(x * 0.196) * 2), [26, 26, 28]);
+  }
+  save('roof_tar.png', img);
 }
 
 { // wooden floor
@@ -667,6 +830,54 @@ foliage('bush.png', 64, [[40, 68, 32], [52, 84, 38], [64, 98, 44]], 160, (a) => 
     }
   }
   save('manhole.png', img);
+}
+
+{ // striped canvas awning (shopfronts)
+  const img = new Img(64, 64);
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+    const s = Math.floor(x / 16) % 2;
+    const pal = s
+      ? [[122, 42, 38], [142, 52, 44], [158, 62, 52]]
+      : [[172, 164, 146], [186, 178, 158], [200, 192, 172]];
+    img.set(x, y, pick(pal, dither(0.72 - y / 200, x, y, 0.14)));
+  }
+  for (let x = 15; x < 64; x += 16) for (let y = 0; y < 64; y++) img.set(x, y, [66, 38, 32]);
+  save('awning.png', img);
+}
+
+{ // graffiti tags decal (transparent)
+  const img = new Img(128, 64, [0, 0, 0, 0]);
+  const rng = mulberry32(3012);
+  const colors = [[186, 60, 48], [70, 140, 170], [190, 170, 60], [96, 170, 84]];
+  for (let tag = 0; tag < 4; tag++) {
+    const c = colors[tag];
+    let x = 12 + rng() * 90, y = 16 + rng() * 26;
+    let dir = (rng() - 0.5) * 1.2;
+    for (let s = 0; s < 46; s++) {
+      for (let t = -1; t <= 1; t++) {
+        const px = Math.round(x), py = Math.round(y) + t;
+        if (px >= 2 && px <= 125 && py >= 2 && py <= 61) img.set(px, py, [c[0], c[1], c[2], 235]);
+      }
+      dir += (rng() - 0.5) * 1.4;
+      x += Math.cos(dir) * 1.6; y += Math.sin(dir) * 1.1;
+      if (y < 8 || y > 56) dir = -dir;
+      if (x < 4 || x > 124) break;
+    }
+  }
+  save('graffiti.png', img);
+}
+
+{ // oil stain decal (transparent, irregular edge)
+  const img = new Img(64, 64, [0, 0, 0, 0]);
+  const n = makeNoise(64, 16, 3013);
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+    const d = Math.hypot(x - 32, y - 32) / 26 + (n(x, y) - 0.5) * 0.7;
+    if (d < 1) {
+      const a = dither(1 - d, x, y, 0.3);
+      if (a > 0.2) img.set(x, y, [16, 14, 12, Math.min(220, a * 255) | 0]);
+    }
+  }
+  save('oil_stain.png', img);
 }
 
 { // soft dark blob decal (wrong shadows, scorch marks)

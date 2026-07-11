@@ -94,12 +94,20 @@ export class CollisionWorld {
   }
 
   /**
-   * Raycast against all boxes. Returns nearest hit distance or Infinity.
-   * origin/dir are {x,y,z}; dir need not be normalised beyond caller intent.
+   * Raycast against boxes near the segment. Returns nearest hit distance or
+   * Infinity. origin/dir are {x,y,z}; dir need not be normalised beyond
+   * caller intent. Candidates come from the broadphase grid over the ray's
+   * XZ bounds, which keeps the (many) furniture/wall boxes cheap to test.
    */
   raycast(origin, dir, maxDist) {
     let best = Infinity;
-    for (const b of this.boxes) {
+    let boxes = this.boxes;
+    if (Number.isFinite(maxDist)) {
+      const ex = origin.x + dir.x * maxDist, ez = origin.z + dir.z * maxDist;
+      boxes = this._candidates(Math.min(origin.x, ex), Math.min(origin.z, ez),
+        Math.max(origin.x, ex), Math.max(origin.z, ez), this._castScratch ??= []);
+    }
+    for (const b of boxes) {
       if (!b.active) continue;
       const t = raySlab(origin, dir, b, maxDist);
       if (t < best) best = t;

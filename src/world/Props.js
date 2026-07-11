@@ -36,15 +36,18 @@ export class PropKit {
     return new THREE.Mesh(geo, typeof tex === 'string' ? this.mat(tex) : tex);
   }
 
-  /** Drop a group on the terrain at (x, z); registers collider if solid. */
-  place(group, x, z, { collide = null, yaw = 0, lift = 0 } = {}) {
+  /** Drop a group on the terrain at (x, z); registers collider if solid.
+   *  `nav: false` keeps the collider but leaves the nav grid open — used for
+   *  interior furniture so room-scale pathing stays possible (steering
+   *  handles the local avoidance). */
+  place(group, x, z, { collide = null, yaw = 0, lift = 0, nav = true } = {}) {
     const y = this.terrain.heightAt(x, z) + lift;
     group.position.set(x, y, z);
     group.rotation.y = yaw;
     if (collide) {
       const [hx, hy, hz] = collide;
       this.collision.addBoxCentered(x, y + hy, z, hx, hy, hz, 'prop');
-      this.nav.blockBox(x - hx, z - hz, x + hx, z + hz);
+      if (nav) this.nav.blockBox(x - hx, z - hz, x + hx, z + hz);
     }
     return group;
   }
@@ -198,7 +201,12 @@ export class PropKit {
     roof.position.set(0, 2.45, 0);
     const seat = this.box(2.8, 0.08, 0.45, 'wallWood');
     seat.position.set(0, 0.55, -0.3);
-    g.add(back, roof, seat);
+    // route information panel on the end post
+    const panel = this.box(0.55, 0.75, 0.05, this.colorMat(0x2d4a66));
+    panel.position.set(1.4, 1.75, 0.5);
+    const routes = this.box(0.4, 0.5, 0.03, this.colorMat(0xd8d2c0));
+    routes.position.set(1.4, 1.78, 0.54);
+    g.add(back, roof, seat, panel, routes);
     return { group: g, collide: [1.7, 1.2, 0.4] };
   }
 
@@ -278,6 +286,126 @@ export class PropKit {
     glow.position.y = 0.16;
     g.add(stones, glow);
     return { group: g };
+  }
+
+  /** Sagging utility wire strung between two world points (visual only). */
+  wireRun(parent, x1, y1, z1, x2, y2, z2, sag = 0.9) {
+    const pts = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      pts.push(new THREE.Vector3(
+        x1 + (x2 - x1) * t,
+        y1 + (y2 - y1) * t - Math.sin(Math.PI * t) * sag,
+        z1 + (z2 - z1) * t));
+    }
+    this._wireMat ??= new THREE.LineBasicMaterial({ color: 0x14161a });
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), this._wireMat);
+    parent.add(line);
+    return line;
+  }
+
+  /** Full gas-station forecourt: canopy on pillars + two dead pumps.
+   *  Placed axis-aligned at (x, z); registers all colliders itself. */
+  gasStation(x, z, parent) {
+    const y = this.terrain.heightAt(x, z);
+    const g = new THREE.Group();
+    for (const [px, pz] of [[-5, -2.5], [5, -2.5], [-5, 2.5], [5, 2.5]]) {
+      const pillar = this.box(0.4, 4.5, 0.4, 'wallConcrete');
+      pillar.position.set(px, 2.25, pz);
+      g.add(pillar);
+      this.collision.addBoxCentered(x + px, y + 2.25, z + pz, 0.3, 2.25, 0.3, 'prop');
+    }
+    const slab = this.box(14, 0.4, 8, 'roofMetal');
+    slab.position.y = 4.7;
+    g.add(slab);
+    this.place(g, x, z);
+    parent.add(g);
+    for (const px of [-3, 3]) {
+      const pump = this.box(0.8, 1.6, 0.5, this.colorMat(0x7a2a24));
+      const pg = new THREE.Group();
+      pg.add(pump);
+      pump.position.y = 0.8;
+      this.place(pg, x + px, z - 1, { collide: [0.5, 0.9, 0.4] });
+      parent.add(pg);
+    }
+    return g;
+  }
+
+  /** Rusting water tower on four legs — a navigation landmark. */
+  waterTower() {
+    const g = new THREE.Group();
+    for (const [lx, lz] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) {
+      const leg = this.box(0.25, 9, 0.25, 'metalRust');
+      leg.position.set(lx, 4.5, lz);
+      leg.rotation.y = Math.PI / 4;
+      g.add(leg);
+    }
+    for (const [r, yy] of [[1.8, 3], [1.8, 6.5]]) { // cross braces
+      for (const a of [0, Math.PI / 2]) {
+        const brace = this.box(r * 2 + 0.4, 0.12, 0.12, 'metalRust');
+        brace.position.y = yy;
+        brace.rotation.y = a;
+        g.add(brace);
+      }
+    }
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 4.5, 10), this.mat('wallMetal'));
+    tank.position.y = 11.2;
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.4, 10), this.mat('roofMetal'));
+    cap.position.y = 14.2;
+    g.add(tank, cap);
+    return { group: g, collide: [2.2, 7.2, 2.2] };
+  }
+
+  /** Horizontal fuel-storage tank on concrete saddles. */
+  fuelTank() {
+    const g = new THREE.Group();
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 6, 10), this.mat('metalRust'));
+    tank.rotation.z = Math.PI / 2;
+    tank.position.y = 1.9;
+    g.add(tank);
+    for (const s of [-1.9, 1.9]) {
+      const saddle = this.box(0.6, 0.9, 2.4, 'wallConcrete');
+      saddle.position.set(s, 0.45, 0);
+      g.add(saddle);
+    }
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.2, 6), this.mat('metalRust'));
+    pipe.position.set(2.6, 1.1, 0.6);
+    g.add(pipe);
+    return { group: g, collide: [3.1, 1.7, 1.5] };
+  }
+
+  /** Brick factory smokestack — the tallest thing on the south skyline. */
+  smokestack(h = 16) {
+    const g = new THREE.Group();
+    const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.5, h, 8), this.mat('brickGray'));
+    stack.position.y = h / 2;
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.6, 8), this.mat('brickRed'));
+    collar.position.y = h - 0.5;
+    g.add(stack, collar);
+    return { group: g, collide: [1.2, h / 2, 1.2] };
+  }
+
+  hayBale() {
+    const g = new THREE.Group();
+    const bale = this.box(1.6, 1.0, 1.0, this.colorMat(0xa08a44));
+    bale.position.y = 0.5;
+    g.add(bale);
+    return { group: g, collide: [0.8, 0.6, 0.5] };
+  }
+
+  picnicTable() {
+    const g = new THREE.Group();
+    const top = this.box(1.8, 0.08, 0.8, 'wallWood');
+    top.position.y = 0.72;
+    g.add(top);
+    for (const s of [-0.75, 0.75]) {
+      const seat = this.box(1.8, 0.07, 0.3, 'wallWood');
+      seat.position.set(0, 0.45, s);
+      const leg = this.box(0.1, 0.72, 1.5, 'wallWood');
+      leg.position.set(s, 0.36, 0);
+      g.add(seat, leg);
+    }
+    return { group: g, collide: [0.95, 0.5, 0.85] };
   }
 
   /** Fence run between two points; registers thin collider. */
