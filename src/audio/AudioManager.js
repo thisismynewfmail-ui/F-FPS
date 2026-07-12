@@ -148,22 +148,22 @@ export class AudioManager {
         this._noise(0.04, 'bandpass', 3600, 1.3, 0.32);
         this._tone('sine', 4800, 0.04, 0.03, 0.03, 0.06, 3400);
         break;
-      case 'shotgun': // blunderbuss: cavernous bell boom + lever-throw clank
-        this._punch(130, 28, 0.3, 0.62, 0, 0, 'sine');
-        this._punch(66, 24, 0.42, 0.44, 0, 0, 'sine');
-        this._noise(0.3, 'lowpass', 750, 0.8, 0.6);
-        this._noise(0.22, 'bandpass', 260, 1.2, 0.3);              // bell mouth flap
-        this._noise(0.5, 'lowpass', 420, 0.5, 0.18, 0.1);          // smoke tail
-        this._tone('square', 850, 0.05, 0.11, 0.3, 0.06, 480);     // lever throw
-        this._brassTick(0.38, 0.08);
+      case 'shotgun': // coachgun: tight modern 12-bore slam + hammer clack
+        this._punch(170, 34, 0.16, 0.6, 0, 0, 'sine');
+        this._punch(72, 26, 0.3, 0.46, 0, 0, 'sine');
+        this._noise(0.16, 'lowpass', 1400, 0.9, 0.58);             // sharp crack
+        this._noise(0.08, 'bandpass', 3200, 1.2, 0.2);             // muzzle sizzle
+        this._noise(0.34, 'lowpass', 480, 0.6, 0.16, 0.06);        // short tail
+        this._tone('square', 1500, 0.02, 0.08, 0.002, 0.05, 900);  // hammer clack
+        this._tone('sine', 2400, 0.05, 0.04, 0.05, 0.08, 1700);    // bore ring
         break;
-      case 'shotgunDouble': // double load: stacked booms, the biggest voice
-        this._punch(130, 26, 0.34, 0.7, 0, 0, 'sine');
-        this._punch(104, 24, 0.36, 0.5, 0.03, 0, 'sine');
-        this._punch(58, 22, 0.48, 0.42, 0, 0, 'sine');
-        this._noise(0.36, 'lowpass', 700, 0.8, 0.66);
-        this._noise(0.7, 'lowpass', 380, 0.5, 0.2, 0.12);
-        this._tone('square', 850, 0.05, 0.1, 0.36, 0.06, 460);
+      case 'shotgunDouble': // both barrels: stacked slams, the biggest voice
+        this._punch(170, 30, 0.2, 0.66, 0, 0, 'sine');
+        this._punch(140, 28, 0.22, 0.5, 0.02, 0, 'sine');
+        this._punch(58, 22, 0.42, 0.44, 0, 0, 'sine');
+        this._noise(0.2, 'lowpass', 1300, 0.9, 0.62);
+        this._noise(0.5, 'lowpass', 420, 0.5, 0.2, 0.1);
+        this._tone('square', 1500, 0.02, 0.08, 0.002, 0.05, 900);
         break;
       case 'rifle': // foundry gun: industrial hammer-crack + steam exhaust
         this._punch(210, 68, 0.05, 0.38, 0, 0, 'square');
@@ -176,13 +176,18 @@ export class AudioManager {
         this._noise(0.045, 'bandpass', 2200, 1.5, 0.42);
         this._noise(0.04, 'highpass', 6000, 0.8, 0.08, 0.012);
         break;
-      case 'sniper': // observatory rifle: colossal crack, breech hiss, valley echoes
+      case 'sniper': // meridian long rifle: colossal crack, then the whole
+        // bolt cycle plays out — lift, draw, case ping, return, lock
         this._punch(160, 34, 0.24, 0.64, 0, 0, 'sawtooth');
         this._punch(58, 24, 0.36, 0.42, 0, 0, 'sine');
         this._noise(0.12, 'lowpass', 4200, 1, 0.58);
-        this._noise(0.06, 'bandpass', 1200, 1.4, 0.14, 0.24);      // harmonica breech slide
         this._noise(0.6, 'lowpass', 680, 0.6, 0.2, 0.16);          // valley echo 1
         this._noise(0.8, 'lowpass', 440, 0.6, 0.12, 0.4);          // valley echo 2
+        this._tone('square', 1400, 0.02, 0.07, 0.24, 0.1, 900);    // bolt lifts
+        this._noise(0.07, 'bandpass', 1100, 1.5, 0.09, 0.36, 0.12);// draw back
+        this._tone('sine', 3400, 0.09, 0.05, 0.5, 0.2, 2400);      // spent case pings
+        this._noise(0.06, 'bandpass', 1200, 1.5, 0.09, 0.72, 0.1); // bolt returns
+        this._tone('square', 1100, 0.025, 0.09, 0.94, 0.06, 700);  // locks
         break;
       case 'batCharge': // sprung heavy swing: spring creak, whip, iron slam
         this._tone('triangle', 240, 0.18, 0.14, 0, 0, 90);         // spring compress creak
@@ -228,19 +233,33 @@ export class AudioManager {
   reload(time, id, tactical = false) {
     if (!this.ctx) return;
     if (id === 'shotgun') {
-      // lever half-open, thumb shells through the gate, lever home
-      this._tone('square', 750, 0.05, 0.12, 0, 0, 350);          // lever open
-      for (const f of [0.28, 0.45, 0.62, 0.78]) {
-        this._noise(0.025, 'bandpass', 1300, 2, 0.11, time * f); // shell through the gate
-        this._tone('square', 900, 0.02, 0.05, time * f + 0.02, 0, 600);
+      // the upward crane: latch aside, action creaks open, both hulls ping
+      // away, two fresh shells chunk home, the barrels slam shut
+      this._tone('square', 1600, 0.025, 0.1, time * 0.02, 0, 1000);   // latch aside
+      this._noise(0.12, 'bandpass', 700, 1.8, 0.1, time * 0.15, 0, 1400); // hinge creak up
+      for (const [w, pan] of [[0.3, 0.12], [0.34, 0.2]]) {            // hulls eject, ping + flutter
+        this._tone('sine', 2900, 0.08, 0.06, time * w, pan, 2100);
+        this._noise(0.05, 'bandpass', 1900, 1.6, 0.07, time * w + 0.02, pan);
       }
-      this._tone('sine', 120, 0.06, 0.2, time * 0.94, 0, 65);    // lever slams home
-      this._brassTick(time * 0.96, 0.1);
+      this._noise(0.035, 'bandpass', 1000, 1.8, 0.13, time * 0.44);   // shell one seats
+      this._tone('sine', 190, 0.05, 0.1, time * 0.46, 0, 120);
+      this._noise(0.035, 'bandpass', 950, 1.8, 0.13, time * 0.57);    // shell two seats
+      this._tone('sine', 180, 0.05, 0.1, time * 0.59, 0, 115);
+      this._noise(0.1, 'bandpass', 750, 1.6, 0.09, time * 0.68, 0, 500); // hinge swings down
+      this._tone('sine', 130, 0.07, 0.24, time * 0.84, 0, 70);        // barrels slam home
+      this._tone('square', 1700, 0.02, 0.09, time * 0.86, 0, 1100);   // latch snaps
+      this._brassTick(time * 0.9, 0.08);
     } else if (id === 'sniper') {
-      this._noise(0.06, 'bandpass', 1100, 1.6, 0.13, 0);         // breech block out
-      for (let i = 0; i < 5; i++) this.click(2000, 0.05, time * (0.25 + i * 0.11)); // 5 seat ticks
-      this._noise(0.06, 'bandpass', 1300, 1.6, 0.13, time * 0.86); // block home
-      this._tone('sine', 140, 0.05, 0.14, time * 0.9, 0, 80);
+      // bolt open, spent clip pings away, fresh clip pressed in with five
+      // seat clicks, bolt slams home
+      this._tone('square', 1400, 0.02, 0.08, time * 0.02, 0.08, 900); // bolt lifts
+      this._noise(0.07, 'bandpass', 1100, 1.5, 0.1, time * 0.08, 0.1);
+      if (!tactical) this._tone('sine', 3600, 0.12, 0.06, time * 0.18, 0.18, 2500); // clip ping
+      for (let i = 0; i < 5; i++) this.click(2000, 0.05, time * (0.34 + i * 0.085)); // seat ticks
+      this._tone('sine', 200, 0.04, 0.1, time * 0.76, 0, 130);       // clip bottoms out
+      this._noise(0.06, 'bandpass', 1200, 1.5, 0.1, time * 0.86);    // bolt forward
+      this._tone('square', 1100, 0.025, 0.1, time * 0.93, 0, 700);   // locks
+      this._tone('sine', 140, 0.05, 0.13, time * 0.94, 0, 80);
     } else {
       // magazine weapons: release, insert, (chamber on a full reload only)
       this.click(1300, 0.1);

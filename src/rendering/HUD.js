@@ -1,29 +1,42 @@
 import { WIN_KILLS } from '../systems/ScoreSystem.js';
+import { Portrait } from './Portrait.js';
+import { hudTextures } from './HudTextures.js';
 
 /**
- * Retro survival-horror HUD, rendered as a DOM overlay (see styles.css for
- * the 1990s treatment: hard corners, scanlines, pixel sprites).
+ * Retro survival-horror HUD, rendered as a DOM overlay.
  *
- * Always visible: segmented health bar (bottom-left), ammo mag/reserve
- * (bottom-right), kill counter vs 250,000 with victory progress bar
- * (top-center), wave + zone (top-left). The weapon menu is HIDDEN by
- * default: it fades in at top-center (0.15 s ease-in-out) when a slot key
- * or the mouse wheel is used, auto-hides after 2.5 s of no input (0.2 s
- * fade), and dismisses immediately on fire/reload. Plus subtitles, pickup
- * feed, damage vignette, scope overlay, and the menu/death/victory screens.
+ * The centrepiece is a full-width bottom CONSOLE BAR modelled on the
+ * reference Fallout-style interface (see the provided images): a rusted,
+ * riveted cast-iron panel carrying, left to right —
+ *
+ *   - a "CLEAN / HURT" condition tab and a green CRT MESSAGE LOG (the flavour
+ *     feed: pickups, sightings, secrets, orders)
+ *   - mechanical HP and AMMO odometer counters
+ *   - a red alarm lamp (pulses on damage) and a MAP lamp
+ *   - the centre PLAYER PORTRAIT in a green CRT monitor (see Portrait.js —
+ *     health-driven head with a well-spaced look-around idle above 50% HP)
+ *   - an AIM ON/OFF indicator (lit while the sniper scope is up)
+ *   - a WEAPON panel: the live weapon silhouette + its fire mode
+ *   - an ARMS panel: the six-slot armoury grid with per-weapon reserves
+ *
+ * Kept above the bar: the 250,000 kill counter + victory progress
+ * (top-centre), wave/zone (top-left), the fly-in ARMORY names, subtitles,
+ * damage vignette, scope overlay and the menu/pause/death/victory screens.
+ * Run stats stay on the pause screen as circular gauges (never on the HUD).
  */
 export class HUD {
   constructor(events, root, actions) {
     this.events = events;
     this.root = root;
     this.actions = actions;
-    this._notes = [];
     this._subtitleTimer = 0;
     this._vignette = 0;
     this._heal = 0;
-    this._banner = 0;
-    this._menuTimer = 0;   // seconds of visibility remaining for the weapon menu
+    this._alarm = 0;        // red lamp glow (fades after damage)
+    this._menuTimer = 0;
     this._menuShown = false;
+    this._scoped = false;
+    this._tex = hudTextures();
     this._build();
     this._wire();
   }
@@ -54,32 +67,17 @@ export class HUD {
     const prog = this._el('div', 'progress', tc, 'panel');
     this.progFill = this._el('div', 'progress-fill', prog);
 
-    // (Run stats — accuracy / score / secrets — live on the pause screen only,
-    // rendered as circular gauges. They are deliberately absent from the HUD.)
+    this._buildConsole();
 
-    // bottom-left: health
-    const bl = this._el('div', 'hud-bl', null, 'panel');
-    this._el('div', 'hp-label', bl).textContent = 'HEALTH';
-    const bar = this._el('div', 'hp-bar', bl);
-    this.hpFill = this._el('div', 'hp-fill', bar);
-    this.hpNum = this._el('div', 'hp-num', bl);
-
-    // bottom-right: ammo
-    const br = this._el('div', 'hud-br', null, 'panel');
-    this.ammoEl = this._el('div', 'ammo', br);
-    this.reloadEl = this._el('div', 'reload-hint', br);
-
-    // top-center: weapon menu (hidden by default; fades in on slot input,
-    // auto-hides after inactivity). Sits just under the kill counter.
+    // top-center: fly-in ARMORY names on weapon switch (detail-on-demand;
+    // the persistent grid lives in the console ARMS panel).
     this.weaponMenu = this._el('div', 'weapon-menu');
     this._el('div', null, this.weaponMenu, 'wm-title').textContent = 'ARMORY';
     this.menuSlots = this._el('div', null, this.weaponMenu, 'wm-slots');
     this.slotEls = [];
-    // filled on first update
 
     this.subtitleEl = this._el('div', 'subtitle');
     this.promptEl = this._el('div', 'prompt');
-    this.notesEl = this._el('div', 'notes');
     this.bannerEl = this._el('div', 'banner');
 
     // scope overlay
@@ -87,7 +85,76 @@ export class HUD {
     this.scopeEl.innerHTML = '<div class="scope-h"></div><div class="scope-v"></div>';
     this.scopeEl.style.display = 'none';
 
-    // ---- screens
+    this._buildScreens();
+  }
+
+  /** The bottom console bar and all of its instruments. */
+  _buildConsole() {
+    const bar = this._el('div', 'console-bar');
+    bar.style.backgroundImage = `url(${this._tex.bar})`;
+
+    // condition tab (top-left corner of the bar)
+    this.condTab = this._el('div', 'cons-cond', bar);
+    this.condTab.textContent = 'CLEAN';
+
+    // --- message log (green CRT) ---
+    const logWrap = this._el('div', 'cons-log-wrap', bar);
+    logWrap.style.backgroundImage = `url(${this._tex.inset})`;
+    this.logEl = this._el('div', 'cons-log', logWrap);
+
+    // --- HP + AMMO odometer meters ---
+    const meters = this._el('div', 'cons-meters', bar);
+    const hpBox = this._el('div', null, meters, 'cons-meter');
+    this._el('div', null, hpBox, 'cons-meter-label').textContent = 'HP';
+    this.hpOdo = this._el('div', null, hpBox, 'odometer');
+    this.hpOdo.style.backgroundImage = `url(${this._tex.inset})`;
+    const ammoBox = this._el('div', null, meters, 'cons-meter');
+    this._el('div', null, ammoBox, 'cons-meter-label').textContent = 'AMMO';
+    this.ammoOdo = this._el('div', null, ammoBox, 'odometer');
+    this.ammoOdo.style.backgroundImage = `url(${this._tex.inset})`;
+
+    // --- alarm lamp + MAP lamp ---
+    const lamps = this._el('div', 'cons-lamps', bar);
+    this.alarmLamp = this._el('div', null, lamps, 'cons-lamp alarm');
+    this.mapLamp = this._el('div', null, lamps, 'cons-lamp map');
+    this.mapLamp.textContent = 'MAP';
+
+    // --- centre portrait monitor ---
+    const mon = this._el('div', 'cons-monitor', bar);
+    this._el('div', null, mon, 'cons-mon-cable');
+    const screen = this._el('div', null, mon, 'cons-mon-screen');
+    this.portraitCanvas = document.createElement('canvas');
+    this.portraitCanvas.width = 116; this.portraitCanvas.height = 132;
+    this.portraitCanvas.className = 'cons-portrait';
+    screen.appendChild(this.portraitCanvas);
+    this.portrait = new Portrait(this.portraitCanvas);
+
+    // --- AIM indicator ---
+    const aim = this._el('div', 'cons-aim', bar);
+    this._el('div', null, aim, 'cons-aim-label').textContent = 'AIM';
+    this.aimLamp = this._el('div', null, aim, 'cons-aim-lamp');
+    this.aimState = this._el('div', null, aim, 'cons-aim-state');
+    this.aimState.textContent = 'OFF';
+
+    // --- WEAPON panel ---
+    const wp = this._el('div', 'cons-weapon', bar);
+    this._el('div', null, wp, 'cons-panel-label').textContent = 'WEAPON';
+    const wpScreen = this._el('div', null, wp, 'cons-weapon-screen');
+    wpScreen.style.backgroundImage = `url(${this._tex.inset})`;
+    this.weaponIcon = document.createElement('canvas');
+    this.weaponIcon.width = 128; this.weaponIcon.height = 44;
+    this.weaponIcon.className = 'cons-weapon-icon';
+    wpScreen.appendChild(this.weaponIcon);
+    this.weaponMode = this._el('div', null, wp, 'cons-weapon-mode');
+
+    // --- ARMS panel (6-slot armoury grid) ---
+    const arms = this._el('div', 'cons-arms', bar);
+    this._el('div', null, arms, 'cons-panel-label').textContent = 'ARMS';
+    this.armsGrid = this._el('div', null, arms, 'cons-arms-grid');
+    this.armsSlots = []; // filled on first update
+  }
+
+  _buildScreens() {
     this.menuEl = this._screen('menu', `
       <h1>F-FPS</h1>
       <h2>THE FOG TOOK THE TOWN. TAKE IT BACK.</h2>
@@ -136,28 +203,33 @@ export class HUD {
     document.getElementById('btn-respawn').addEventListener('click', () => this.actions.onRespawn());
 
     const on = this.events.on.bind(this.events);
-    on('subtitle', ({ text }) => this.subtitle(text));
-    on('player:damage', ({ amount }) => { this._vignette = Math.min(1, this._vignette + amount / 40 + 0.25); });
+    on('subtitle', ({ text }) => { this.subtitle(text); this.logMsg(text); });
+    on('player:damage', ({ amount }) => {
+      this._vignette = Math.min(1, this._vignette + amount / 40 + 0.25);
+      this._alarm = 1;
+    });
     on('player:heal', () => { this._heal = 0.5; });
     on('pickup', ({ label, amount, type }) => {
-      this.note(type === 'key' ? `${label.toUpperCase()}` : `+${amount} ${label.toUpperCase()}`);
+      this.logMsg(type === 'key' ? `You pick up the ${label}.` : `You gather ${amount} ${label}.`, 'good');
     });
     on('secret:found', ({ label, count, total }) => {
-      this.note(`SECRET FOUND (${count}/${total}) — ${label.toUpperCase()}`, 'gold');
+      this.logMsg(`SECRET (${count}/${total}) — ${label}.`, 'gold');
     });
     on('zone:unlock', ({ zone }) => {
       this.subtitle(`The way into ${zone.name} is clear.`);
+      this.logMsg(`The way into ${zone.name} is clear.`, 'gold');
     });
-    on('wave:start', ({ wave }) => this.banner('WAVE ' + wave));
-    on('wave:end', () => this.note('WAVE CLEAR — SUPPLIES INBOUND', 'gold'));
-    on('scope', ({ on: scoped }) => { this.scopeEl.style.display = scoped ? 'block' : 'none'; });
+    on('wave:start', ({ wave }) => { this.banner('WAVE ' + wave); this.logMsg(`Wave ${wave}. They are coming.`, 'warn'); });
+    on('wave:end', () => this.logMsg('Wave clear. Supplies inbound.', 'good'));
+    on('scope', ({ on: scoped }) => {
+      this._scoped = scoped;
+      this.scopeEl.style.display = scoped ? 'block' : 'none';
+    });
     on('victory', ({ stats }) => {
       this._fillStats(document.getElementById('victory-stats'), stats);
       this.showScreen('victory');
     });
 
-    // weapon menu: number key / scroll reveals it; firing or reloading (a
-    // state-changing action) dismisses it immediately.
     on('weapon:menu:poke', () => this.showWeaponMenu());
     on('weapon:switch', () => this.showWeaponMenu());
     on('weapon:fire', () => this.hideWeaponMenu());
@@ -182,42 +254,63 @@ export class HUD {
     }
   }
 
-  /** Small gold line-art glyph so each slot reads at a glance. */
-  _drawGlyph(canvas, id) {
+  /** Prepend a line to the green CRT message log; keep the last few. */
+  logMsg(text, cls = '') {
+    if (!this.logEl) return;
+    const line = document.createElement('div');
+    line.className = 'log-line ' + cls;
+    line.textContent = '• ' + text;
+    this.logEl.insertBefore(line, this.logEl.firstChild);
+    while (this.logEl.children.length > 5) this.logEl.lastChild.remove();
+    requestAnimationFrame(() => line.classList.add('in'));
+  }
+
+  /**
+   * Filled weapon silhouette glyph — used both by the WEAPON panel (big) and
+   * the ARMS grid (small). Drawn in the steampunk brass/steel palette.
+   */
+  _drawGlyph(canvas, id, color = '#d8b552') {
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#e0b840'; ctx.fillStyle = '#e0b840';
-    ctx.lineWidth = 2; ctx.lineJoin = 'round';
-    const p = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); };
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(W / 64, H / 34); // author in a 64x34 space
+    ctx.translate(-32, -17);
+    ctx.strokeStyle = color; ctx.fillStyle = color;
+    ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+    const poly = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); };
     switch (id) {
-      case 'pistol': // slim autoloader with a ventilated sight rib
-        p([[6, 10], [42, 10], [42, 16], [22, 16], [22, 30], [14, 30], [14, 16], [6, 16]]);
-        for (let x = 8; x < 40; x += 8) ctx.fillRect(x, 6, 5, 2);
+      case 'pistol': // slide + ventilated rib + grip
+        poly([[8, 12], [46, 12], [46, 18], [26, 18], [26, 30], [17, 30], [17, 18], [8, 18]]);
+        for (let x = 12; x < 44; x += 7) ctx.fillRect(x, 8, 4, 2);
         break;
-      case 'shotgun': // under-lever gun with a flared bell muzzle
-        ctx.fillRect(14, 12, 34, 5);
-        p([[4, 8], [14, 11], [14, 18], [4, 21]]);               // bell flare
-        ctx.fillRect(46, 10, 12, 12);                           // stock
-        ctx.strokeRect(38, 19, 9, 8);                           // lever loop
+      case 'shotgun': // over-under twin bores + stock
+        ctx.fillRect(6, 11, 40, 4); ctx.fillRect(6, 16, 40, 4);
+        poly([[46, 12], [58, 14], [58, 21], [46, 23]]);
         break;
-      case 'rifle': // jacketed machine gun with a carry handle
-        ctx.fillRect(6, 12, 44, 7);
-        for (let x = 9; x < 30; x += 6) ctx.clearRect(x, 14, 3, 3); // jacket vents
-        ctx.fillRect(34, 6, 12, 3); ctx.fillRect(34, 8, 2, 5); ctx.fillRect(44, 8, 2, 5); // handle
-        ctx.fillRect(50, 13, 8, 5); ctx.fillRect(38, 19, 6, 10);
+      case 'rifle': // shrouded barrel + flank drum
+        ctx.fillRect(6, 13, 42, 7);
+        for (let x = 10; x < 40; x += 5) ctx.fillRect(x, 12, 2, 9);
+        ctx.beginPath(); ctx.arc(44, 12, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(48, 15, 10, 8);
         break;
-      case 'sniper': // very long octagonal barrel + scope tube
-        ctx.fillRect(4, 15, 52, 3);
-        ctx.fillRect(26, 8, 22, 4);                             // telescope
-        ctx.fillRect(24, 9, 3, 6); ctx.fillRect(46, 9, 3, 6);   // mounts
-        p([[50, 14], [58, 14], [58, 24], [52, 24]]);            // skeleton stock
+      case 'sniper': // long barrel + scope
+        ctx.fillRect(4, 16, 54, 3);
+        ctx.fillRect(24, 9, 26, 4);
+        ctx.fillRect(22, 10, 3, 6); ctx.fillRect(48, 10, 3, 6);
+        poly([[50, 15], [60, 15], [60, 24], [52, 24]]);
         break;
       case 'bat': // studded club
-        p([[8, 19], [40, 11], [54, 11], [54, 21], [40, 21]]);
-        ctx.clearRect(44, 14, 2, 2); ctx.clearRect(49, 14, 2, 2); // stud dots
+        poly([[8, 20], [42, 10], [56, 10], [56, 22], [42, 22]]);
+        ctx.save(); ctx.fillStyle = '#2a2a2a';
+        ctx.beginPath(); ctx.arc(46, 14, 1.6, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(51, 14, 1.6, 0, 7); ctx.fill();
+        ctx.restore();
         break;
-      default: ctx.fillRect(10, 12, 40, 8);
+      default: ctx.fillRect(10, 13, 44, 8);
     }
+    ctx.restore();
   }
 
   subtitle(text) {
@@ -225,19 +318,20 @@ export class HUD {
     this._subtitleTimer = 4.5;
   }
 
-  note(text, cls = '') {
-    const n = this._el('div', null, this.notesEl, 'note ' + cls);
-    n.textContent = text;
-    setTimeout(() => n.classList.add('fade'), 2600);
-    setTimeout(() => n.remove(), 3400);
-    while (this.notesEl.children.length > 6) this.notesEl.firstChild.remove();
-  }
-
   banner(text) {
     this.bannerEl.textContent = text;
     this.bannerEl.classList.remove('show');
-    void this.bannerEl.offsetWidth; // restart animation
+    void this.bannerEl.offsetWidth;
     this.bannerEl.classList.add('show');
+  }
+
+  /** Three fixed digits for the mechanical HP/ammo odometers. */
+  _odometer(el, value, infinite = false) {
+    if (infinite) { el.innerHTML = '<span class="digit inf">&#8734;</span>'; return; }
+    const s = String(Math.max(0, Math.min(999, value | 0))).padStart(3, '0');
+    if (el._last === s) return;
+    el._last = s;
+    el.innerHTML = [...s].map((d) => `<span class="digit">${d}</span>`).join('');
   }
 
   _fillStats(el, stats) {
@@ -254,7 +348,6 @@ export class HUD {
       <span>TANKS</span><b>${(stats.byType.Tank || 0).toLocaleString('en-US')}</b>`;
   }
 
-  /** One circular gauge. ratio 0..1 fills the arc; centre shows num + sub. */
   _ring(label, ratio, num, sub, cls = '') {
     const C = 2 * Math.PI * 44;
     const off = C * (1 - Math.max(0, Math.min(1, ratio)));
@@ -268,7 +361,6 @@ export class HUD {
       </div><div class="ring-label">${label}</div></div>`;
   }
 
-  /** Pause-screen stats as a row of circular gauges. */
   fillPauseStats(stats, secrets) {
     const el = document.getElementById('pause-stats');
     const t = stats.timePlayed;
@@ -289,40 +381,85 @@ export class HUD {
 
   /** Per-frame refresh with a plain data snapshot. */
   update(dt, d) {
-    // health
     const hpFrac = d.health / d.maxHealth;
-    this.hpFill.style.width = (hpFrac * 100).toFixed(1) + '%';
-    this.hpFill.className = hpFrac < 0.25 ? 'critical' : hpFrac < 0.5 ? 'low' : '';
-    this.hpNum.textContent = Math.ceil(d.health);
-
-    // ammo
     const cur = d.weapons.find((w) => w.active);
-    if (cur.mag === Infinity) {
-      this.ammoEl.innerHTML = '<b>—</b>';
-    } else {
-      this.ammoEl.innerHTML = `<b>${cur.mag}</b> / ${cur.reserve === Infinity ? '∞' : cur.reserve}`;
-      this.ammoEl.classList.toggle('empty', cur.mag === 0 && !cur.reloading);
-    }
-    this.reloadEl.textContent = cur.reloading ? 'RELOADING…'
-      : (cur.mag === 0 && cur.reserve === 0 && cur.id !== 'bat') ? 'NO AMMO' : '';
 
-    // kills + progress
+    // --- console: condition tab + HP odometer + portrait ---
+    this.condTab.textContent = hpFrac <= 0.25 ? 'CRITICAL' : hpFrac <= 0.5 ? 'HURT' : 'CLEAN';
+    this.condTab.className = 'cons-cond ' + (hpFrac <= 0.25 ? 'crit' : hpFrac <= 0.5 ? 'warn' : '');
+    this._odometer(this.hpOdo, Math.ceil(d.health));
+    this.hpOdo.classList.toggle('low', hpFrac < 0.5);
+    this.hpOdo.classList.toggle('crit', hpFrac < 0.25);
+    this.portrait.setHealth(hpFrac);
+    this.portrait.update(dt);
+
+    // --- console: AMMO odometer ---
+    if (cur.mag === Infinity) {
+      this.ammoOdo.innerHTML = '<span class="digit melee">—</span>';
+      this.ammoOdo._last = 'melee';
+    } else {
+      this._odometer(this.ammoOdo, cur.mag);
+      this.ammoOdo.classList.toggle('empty', cur.mag === 0 && !cur.reloading);
+    }
+
+    // --- console: alarm lamp + AIM indicator ---
+    this._alarm = Math.max(0, this._alarm - dt * 2);
+    this.alarmLamp.style.opacity = (0.35 + this._alarm * 0.65).toFixed(2);
+    this.alarmLamp.classList.toggle('lit', this._alarm > 0.05 || hpFrac < 0.25);
+    this.aimLamp.classList.toggle('on', this._scoped);
+    this.aimState.textContent = this._scoped ? 'ON' : 'OFF';
+
+    // --- console: WEAPON panel (icon + fire mode) ---
+    if (this._weaponShown !== cur.id) {
+      this._weaponShown = cur.id;
+      this._drawGlyph(this.weaponIcon, cur.id, '#e2c26a');
+      this.weaponMode.textContent = cur.reloading ? 'RELOAD' : cur.fireMode;
+    } else {
+      const mode = cur.reloading ? 'RELOAD'
+        : (cur.mag === 0 && cur.reserve === 0 && cur.id !== 'bat') ? 'EMPTY' : cur.fireMode;
+      if (this.weaponMode.textContent !== mode) this.weaponMode.textContent = mode;
+    }
+    this.weaponMode.classList.toggle('warn', cur.reloading);
+    this.weaponMode.classList.toggle('empty', cur.mag === 0 && cur.reserve === 0 && cur.id !== 'bat');
+
+    // --- console: ARMS grid (persistent 6-slot armoury) ---
+    if (!this.armsSlots.length) {
+      d.weapons.forEach((w) => {
+        const slot = this._el('div', null, this.armsGrid, 'arms-slot');
+        const key = this._el('div', null, slot, 'arms-key'); key.textContent = w.slot;
+        const cv = document.createElement('canvas'); cv.width = 44; cv.height = 22; cv.className = 'arms-icon';
+        this._drawGlyph(cv, w.id, '#b9a24a'); slot.appendChild(cv);
+        const rsv = this._el('div', null, slot, 'arms-rsv');
+        this.armsSlots.push({ slot, rsv });
+      });
+      // pad to a 6th decorative empty bay to match the reference grid
+      const empty = this._el('div', null, this.armsGrid, 'arms-slot empty');
+      empty.innerHTML = '<div class="arms-key">6</div>';
+    }
+    d.weapons.forEach((w, i) => {
+      const s = this.armsSlots[i];
+      s.slot.classList.toggle('active', w.active);
+      s.slot.classList.toggle('dry', w.mag === 0 && w.reserve === 0 && w.id !== 'bat');
+      const rsv = w.mag === Infinity ? '∞' : w.reserve === Infinity ? '∞' : w.reserve;
+      const mag = w.mag === Infinity ? '·' : w.mag;
+      s.rsv.textContent = `${mag}·${rsv}`;
+    });
+
+    // --- kills + progress (top-center) ---
     this.killsEl.textContent = `KILLS: ${d.kills.toLocaleString('en-US')} / ${WIN_KILLS.toLocaleString('en-US')}`;
     this.progFill.style.width = (Math.min(1, d.kills / WIN_KILLS) * 100).toFixed(3) + '%';
 
-    // wave / zone
+    // --- wave / zone ---
     this.waveEl.textContent = d.wave.state === 'active' ? 'WAVE ' + d.wave.n : d.wave.n === 0 ? 'THEY ARE COMING' : 'RESPITE';
     this.respiteEl.textContent = d.wave.state === 'respite' ? 'next wave in ' + Math.ceil(d.wave.respiteLeft) + 's' : '';
     this.zoneEl.textContent = d.zoneName.toUpperCase();
 
-    // (accuracy / score / secrets intentionally not shown on the HUD)
-
-    // weapon menu (built once, then refreshed; visibility handled by timer)
+    // --- fly-in ARMORY names (built once) ---
     if (!this.slotEls.length) {
       for (const w of d.weapons) {
         const slot = this._el('div', null, this.menuSlots, 'wm-slot');
         const cv = document.createElement('canvas'); cv.width = 64; cv.height = 34;
-        cv.className = 'wm-glyph'; this._drawGlyph(cv, w.id);
+        cv.className = 'wm-glyph'; this._drawGlyph(cv, w.id, '#e0b840');
         const key = this._el('div', null, slot, 'wm-key'); key.textContent = w.slot;
         slot.appendChild(cv);
         this._el('div', null, slot, 'wm-name').textContent = w.flavor || w.name;
@@ -338,14 +475,12 @@ export class HUD {
       ammo.textContent = w.mag === Infinity ? 'MELEE'
         : `${w.mag} / ${w.reserve === Infinity ? '∞' : w.reserve}`;
     });
-
-    // auto-hide after inactivity
     if (this._menuTimer > 0) {
       this._menuTimer -= dt;
       if (this._menuTimer <= 0) this.hideWeaponMenu();
     }
 
-    // prompt
+    // --- prompt ---
     if (d.prompt) {
       this.promptEl.textContent = typeof d.prompt === 'function' ? d.prompt() : d.prompt;
       this.promptEl.style.display = 'block';
@@ -353,7 +488,7 @@ export class HUD {
       this.promptEl.style.display = 'none';
     }
 
-    // subtitle fade
+    // --- subtitle fade ---
     if (this._subtitleTimer > 0) {
       this._subtitleTimer -= dt;
       this.subtitleEl.style.opacity = Math.min(1, this._subtitleTimer / 0.6);
@@ -361,7 +496,7 @@ export class HUD {
       this.subtitleEl.style.opacity = 0;
     }
 
-    // damage vignette: recent hits + persistent low-health pulse
+    // --- damage vignette + heal flash ---
     this._vignette = Math.max(0, this._vignette - dt * 1.4);
     const lowHp = hpFrac < 0.3 ? (0.3 - hpFrac) * 1.6 * (0.7 + 0.3 * Math.sin(performance.now() / 220)) : 0;
     document.getElementById('vignette').style.opacity = Math.min(1, this._vignette + lowHp);

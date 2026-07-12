@@ -257,6 +257,7 @@ export class WeaponManager {
       name: w.config.name,
       flavor: w.config.flavor,
       altLabel: w.config.altLabel,
+      fireMode: w.config.fireMode ?? (w.config.melee ? 'MELEE' : w.config.auto ? 'AUTO' : 'SINGLE'),
       slot: w.config.slot,
       active: i === this.index,
       mag: w.mag,

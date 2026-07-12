@@ -45,17 +45,22 @@ seconds (or the instant you fire).
 
 Every weapon is a fully 3D, PBR-textured model with a steampunk / Bioshock
 finish — brass, blued gunsteel, cast iron, copper, oiled walnut and cracked
-leather — animated with an idle sway, a three-phase fire recoil, a full
-reload, and equip/unequip transitions. Each has its own synthesised firing
-sound and a distinct right-mouse secondary action:
+leather — each a novel take on its type with a **working action**. All are
+animated with an idle sway, a three-phase fire recoil, extensive part motion
+(slides, hammers, bolts, cranes, ratcheting drums), a full reload
+choreography, equip/unequip transitions, and **ejected brass** (cases, spent
+shells, dropped magazines, en-bloc clips thrown from the real ejection port).
+They sit rotated to face mostly forward — muzzle near the crosshair — while
+still showing their worked left flank. Each has its own layered synthesised
+firing sound and a distinct right-mouse secondary action:
 
-| Slot | Weapon | Secondary (RMB) |
-| --- | --- | --- |
-| 1 | Regent Autoloader (pistol) | **Hair-trigger** — rapid auto fire, less damage per round |
-| 2 | Coach Breaker (shotgun) | **Both barrels** — twin blast, two shells, big knockback |
-| 3 | Automaton Repeater (rifle) | **3-round burst** — tight grouping |
-| 4 | Rangefinder (sniper) | **Scope** — telescopic zoom |
-| 5 | Piston Bat (melee) | **Heavy swing** — charged, wider arc, more knockback |
+| Slot | Weapon | Action | Secondary (RMB) |
+| --- | --- | --- | --- |
+| 1 | Regent Autoloader (pistol) | short-recoil auto; slide racks, hammer re-cocks, case + mag eject | **Hair-trigger** — rapid auto fire, less damage per round |
+| 2 | Crane Coachgun (shotgun) | modern over-under that **breaks UPWARD** — barrels crane skyward, twin hulls eject over the shoulder, two fresh shells seat, action snaps home | **Both barrels** — twin blast, two shells, big knockback |
+| 3 | Foundry Gun (rifle) | Lewis-pattern steam machine gun; flank pan drum ratchets a round per shot, charging handle reciprocates, live pressure valve, drum swap reload | **3-round burst** — tight grouping |
+| 4 | Meridian Long Rifle (sniper) | precision **bolt-action** — full lift/draw/eject/close cycle each shot, glowing telescope reticle, rangefinder drum, en-bloc clip reload | **Scope** — telescopic zoom |
+| 5 | Ironshod Slugger (melee) | ironclad club; swings alternate forehand / backhand horizontal cuts | **Heavy swing** — charged overhead slam, wider arc, more knockback |
 
 ## Dev console
 
@@ -139,9 +144,18 @@ There is deliberately no command that touches the kill counter — the
 - **Inventory (Tab):** a themed satchel for quest items such as keys. Opening
   frees the mouse for the UI and freezes the world; Tab (or Esc) closes it and
   hands the mouse straight back to the game.
-- **HUD & stats:** the HUD carries only health, ammo, wave/zone and the kill
-  counter. Run stats — accuracy, score, secrets, progress, time — live on the
-  **pause screen as circular gauges**, not on the HUD.
+- **HUD & stats:** a full-width **Fallout-style console bar** across the bottom
+  — a rusted, riveted cast-iron panel (procedurally textured) carrying a
+  CLEAN/HURT/CRITICAL condition tab, a green CRT message log, mechanical HP and
+  AMMO odometers, a damage alarm lamp and a MAP lamp, a centre **player
+  portrait** on a green CRT monitor, an AIM ON/OFF indicator (lit while
+  scoped), a WEAPON panel (live silhouette + fire mode), and a six-slot ARMS
+  armoury grid with per-weapon reserves. The portrait is driven by health —
+  a well-spaced forward/left/right **look-around idle above 50% HP**, a stern
+  face at ≤50%, a drained face at ≤25% (the CRT tints green → amber → red to
+  match). The 250,000 kill counter and victory progress stay top-centre;
+  wave/zone top-left. Run stats — accuracy, score, secrets, progress, time —
+  live on the **pause screen as circular gauges**, not on the HUD.
 - **Waves:** **kill-driven** escalating hordes. Each wave sets a kill quota and
   clears the moment you hit it, so racking up kills is what advances the wave;
   then a short respite with a supply drop before the next, larger wave. Past
@@ -176,8 +190,9 @@ src/engine/         game loop, input, event bus
 src/ai/             sensory system: senses, steering, behaviour arbiter
 src/entities/       player, zombies, exploder, NPC, cockroach, pickups
 src/weapons/        weapon configs + firing/ammo/hit resolution
-src/rendering/      renderer, texture pipeline, billboards, HUD, 3D weapon
-                    view + PBR weapon materials, effects
+src/rendering/      renderer, texture pipeline, billboards, HUD (console bar +
+                    Portrait CRT + HudTextures), 3D weapon view + PBR weapon
+                    materials, effects
 src/audio/          WebAudio synthesis (all sounds)
 src/world/          terrain, buildings, props, vegetation, zones, nav, secrets, sky
 src/systems/        score/win condition, waves, spawning, game state, inventory

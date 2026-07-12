@@ -234,7 +234,7 @@ const PALETTES = {
   leather:    P({ seed: 51, color: [74, 46, 28], style: 'leather', metal: 0, rough: 0.72, normalStr: 2.2, cell: 10, grimeAmt: 0.55 }),
   canvas:     P({ seed: 61, color: [104, 92, 60], style: 'canvas', metal: 0, rough: 0.86, normalStr: 1.5, weave: 26, grimeAmt: 0.5 }),
   // --- the 2nd-generation weapon families (one signature set per weapon) ---
-  nickel:       P({ seed: 71, color: [186, 190, 198], aSize: 1024, normalStr: 1.8, rough: 0.16, wear: 0.22, grainU: 4, grainV: 70, polish: 1.5, edgeBright: 0.8 }),
+  nickel:       P({ seed: 71, color: [164, 170, 182], aSize: 1024, normalStr: 1.8, rough: 0.24, wear: 0.3, grainU: 4, grainV: 70, polish: 1.5, edgeBright: 0.8 }),
   blackSteel:   P({ seed: 72, color: [32, 34, 38], aSize: 1024, normalStr: 2.2, rough: 0.5, wear: 0.55, grainU: 5, grainV: 40, panels: 6, rivets: 6, edgeBright: 1.4 }),
   bronzePatina: P({ seed: 73, color: [128, 106, 58], rough: 0.52, wear: 0.9, grainV: 24, rivets: 5, grimeAmt: 0.6, edgeBright: 1.0, wearTint: [88, 134, 110] }),
   hammeredIron: P({ seed: 74, color: [54, 52, 54], rough: 0.6, wear: 0.7, grain: 2.4, grainU: 12, grainV: 12, edgeBright: 0.9 }),
