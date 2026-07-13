@@ -53,67 +53,15 @@ html, body {
   padding: 6px 10px;
 }
 
-/* themed gauge panels — rusted iron ground, brass frame, brass rivets,
-   matching the console bar. Shared by the WAVE (top-left) and CONFIRMED
-   KILLS (top-centre) readouts. */
-.gauge-panel {
-  position: absolute; top: 12px; z-index: 20;
-  background-color: #34312f; background-size: cover; background-position: center;
-  border: 2px solid #6a5a38; border-radius: 4px;
-  padding: 6px 12px 8px; image-rendering: pixelated;
-  box-shadow: inset 0 2px 0 rgba(0,0,0,0.4), inset 0 0 12px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.5);
-}
-.gauge-panel > * { image-rendering: auto; }
-.gauge-panel::before, .gauge-panel::after { /* brass corner rivets */
-  content: ''; position: absolute; width: 5px; height: 5px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #d8b552, #6a5324);
-  top: 4px;
-}
-.gauge-panel::before { left: 4px; }
-.gauge-panel::after { right: 4px; }
-.gauge-title {
-  font-size: 10px; letter-spacing: 4px; color: #b6a068; text-align: center;
-}
-
-#hud-tl { left: 12px; min-width: 190px; }
-.gauge-head { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
-#wave {
-  font-size: 26px; font-weight: bold; color: #e8e2c8; letter-spacing: 1px;
-  text-shadow: 0 0 6px rgba(224,184,64,0.4);
-}
-#zone { font-size: 11px; letter-spacing: 2px; color: #cfe0c0; text-align: center; margin-top: 1px; }
-.wave-prog { margin-top: 6px; }
-.wave-prog-label { font-size: 9px; letter-spacing: 1px; color: #8fa37a; text-align: center; }
-.wave-prog-label span { color: #7be07b; }
-.wave-prog-bar {
-  margin-top: 3px; height: 8px; padding: 1px;
-  background: #0a0f0a; border: 1px solid #4a4230; box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
-}
-.wave-prog-fill { height: 100%; width: 0; background: linear-gradient(#b03030, #d05a4a); transition: width 0.3s; }
-.wave-prog-fill.done { background: linear-gradient(#4a8a3a, #6ac84a); }
-#respite { font-size: 10px; color: #d8b552; letter-spacing: 1px; text-align: center; margin-top: 4px; }
-
-#hud-tc { left: 50%; transform: translateX(-50%); text-align: center; min-width: 240px; }
-.kills-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin-top: 2px; }
-.kills-odo {
-  font-size: 26px; font-weight: bold; letter-spacing: 2px; color: #e8e2c8;
-  text-shadow: 0 0 6px rgba(224,184,64,0.4);
-}
-#kill-goal { font-size: 12px; color: #8a9478; letter-spacing: 1px; }
-#progress {
-  margin-top: 5px; height: 10px; padding: 1px;
-  background: #0a0f0a; border: 1px solid #4a4230; box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
-}
-#progress-fill { height: 100%; width: 0; background: linear-gradient(#c8a03a, #e0b840); min-width: 1px; }
-
 /* ===================================================================
-   CONSOLE BAR — full-width bottom Fallout-style instrument panel.
-   Rusted riveted iron ground, brass trim, green CRT insets.
+   CONSOLE BAR — centred bottom Fallout-style instrument panel.
+   Rusted riveted iron ground, brass trim, green CRT insets. A header
+   strip (WAVE + CONFIRMED KILLS) sits over the main instrument row.
    =================================================================== */
 #console-bar {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: 10px;
-  width: min(1180px, calc(100% - 24px)); height: 132px;
-  z-index: 21; display: flex; align-items: stretch; justify-content: center; gap: 6px;
+  width: min(1200px, calc(100% - 24px));
+  z-index: 21; display: flex; flex-direction: column; gap: 6px;
   padding: 8px 12px;
   background-color: #34312f; background-size: cover; background-position: center;
   border: 3px solid #6a5a38; border-radius: 8px;
@@ -123,7 +71,7 @@ html, body {
   image-rendering: pixelated;
 }
 #console-bar > div { image-rendering: auto; }
-/* brass rivets in the four corners of the mounted console */
+/* brass rivets in the bottom corners of the mounted console */
 #console-bar::before, #console-bar::after {
   content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #d8b552, #6a5324); bottom: 6px;
@@ -131,13 +79,61 @@ html, body {
 #console-bar::before { left: 8px; }
 #console-bar::after { right: 8px; }
 
-/* condition tab (top-left corner) */
+/* condition tab (sticks up from the top edge) */
 #cons-cond {
   position: absolute; top: -14px; left: 14px;
   font-size: 10px; letter-spacing: 3px; color: #cfe0c0;
   background: #1a1c16; border: 2px solid #6a5a38; border-bottom: none;
-  border-radius: 4px 4px 0 0; padding: 2px 12px 3px;
+  border-radius: 4px 4px 0 0; padding: 2px 12px 3px; z-index: 1;
 }
+#cons-cond.warn { color: #e6c24a; border-color: #7a6a2a; }
+#cons-cond.crit { color: #e05a44; border-color: #7a2a20; }
+
+/* --- header strip: WAVE (left) + CONFIRMED KILLS (right) --- */
+#cons-header { display: flex; gap: 8px; align-items: stretch; height: 40px; }
+.cons-hdr-label { font-size: 9px; letter-spacing: 3px; color: #b6a068; }
+#cons-wave, #cons-kills {
+  display: flex; align-items: center; gap: 12px;
+  background-color: #0b1109; background-size: cover;
+  border: 2px solid #55492c; border-radius: 3px; padding: 3px 12px;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.85); position: relative; overflow: hidden;
+}
+#cons-wave::after, #cons-kills::after { /* CRT scanlines over the readouts */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px);
+}
+#cons-wave { flex: 0 0 auto; }
+#cons-kills { flex: 1 1 auto; justify-content: flex-end; }
+.cons-wave-head { display: flex; align-items: baseline; gap: 8px; }
+#wave {
+  font-size: 22px; font-weight: bold; color: #e8e2c8; letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(224,184,64,0.4);
+}
+#zone { font-size: 10px; letter-spacing: 1px; color: #9fb890; }
+.cons-wave-stat { display: flex; flex-direction: column; gap: 3px; min-width: 130px; }
+.wave-prog-label { font-size: 9px; letter-spacing: 1px; color: #8fa37a; white-space: nowrap; }
+.wave-prog-label span { color: #7be07b; }
+.wave-prog-bar {
+  height: 7px; padding: 1px;
+  background: #0a0f0a; border: 1px solid #4a4230; box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+}
+.wave-prog-fill { height: 100%; width: 0; background: linear-gradient(#b03030, #d05a4a); transition: width 0.3s; }
+.wave-prog-fill.done { background: linear-gradient(#4a8a3a, #6ac84a); }
+#respite { font-size: 9px; color: #d8b552; letter-spacing: 1px; white-space: nowrap; }
+.kills-row { display: flex; align-items: baseline; gap: 8px; }
+.kills-odo {
+  font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #e8e2c8;
+  text-shadow: 0 0 6px rgba(224,184,64,0.4);
+}
+#kill-goal { font-size: 12px; color: #8a9478; letter-spacing: 1px; }
+#progress {
+  width: 260px; max-width: 40vw; height: 8px; padding: 1px;
+  background: #0a0f0a; border: 1px solid #4a4230; box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+}
+#progress-fill { height: 100%; width: 0; background: linear-gradient(#c8a03a, #e0b840); min-width: 1px; }
+
+/* --- body row: instrument cluster (height driven by the portrait) --- */
+#cons-body { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #cons-cond.warn { color: #e6c24a; border-color: #7a6a2a; }
 #cons-cond.crit { color: #e05a44; border-color: #7a2a20; }
 

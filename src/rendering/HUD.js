@@ -55,35 +55,8 @@ export class HUD {
     this._el('div', 'healflash');
     this._el('div', 'crosshair').innerHTML = '<span></span>';
 
-    // top-left: WAVE gauge + zone + wave-progress counter (themed to match
-    // the console: rusted-iron ground, brass frame, green CRT readouts)
-    const tl = this._el('div', 'hud-tl', null, 'gauge-panel');
-    tl.style.backgroundImage = `url(${this._tex.bar})`;
-    const waveHead = this._el('div', null, tl, 'gauge-head');
-    this._el('div', null, waveHead, 'gauge-title').textContent = 'WAVE';
-    this.waveEl = this._el('div', 'wave', waveHead, 'gauge-num');
-    this.zoneEl = this._el('div', 'zone', tl);
-    // wave-stats: kills banked toward the current wave's quota
-    const wp = this._el('div', 'wave-prog', tl);
-    const wpLabel = this._el('div', null, wp, 'wave-prog-label');
-    wpLabel.innerHTML = 'CLEARED <span id="wave-cleared">0</span> / <span id="wave-quota">0</span>';
-    const wpBar = this._el('div', null, wp, 'wave-prog-bar');
-    this.waveProgFill = this._el('div', null, wpBar, 'wave-prog-fill');
-    this.waveClearedEl = wpLabel.querySelector('#wave-cleared');
-    this.waveQuotaEl = wpLabel.querySelector('#wave-quota');
-    this.respiteEl = this._el('div', 'respite', tl);
-
-    // top-center: confirmed-kills counter toward 250,000 (themed gauge)
-    const tc = this._el('div', 'hud-tc', null, 'gauge-panel');
-    tc.style.backgroundImage = `url(${this._tex.bar})`;
-    this._el('div', null, tc, 'gauge-title').textContent = 'CONFIRMED KILLS';
-    const killRow = this._el('div', null, tc, 'kills-row');
-    this.killsEl = this._el('div', 'kills', killRow, 'kills-odo');
-    this.killGoalEl = this._el('div', 'kill-goal', killRow);
-    this.killGoalEl.textContent = '/ ' + WIN_KILLS.toLocaleString('en-US');
-    const prog = this._el('div', 'progress', tc);
-    this.progFill = this._el('div', 'progress-fill', prog);
-
+    // (WAVE + CONFIRMED KILLS readouts live in the console header strip, built
+    // by _buildConsole — nothing floats at the top of the screen.)
     this._buildConsole();
 
     // top-center: fly-in ARMORY names on weapon switch (detail-on-demand;
@@ -114,13 +87,44 @@ export class HUD {
     this.condTab = this._el('div', 'cons-cond', bar);
     this.condTab.textContent = 'CLEAN';
 
+    // === HEADER STRIP: WAVE readout (left) + CONFIRMED KILLS (right) ===
+    const header = this._el('div', 'cons-header', bar);
+    // -- WAVE section --
+    const waveSec = this._el('div', 'cons-wave', header);
+    waveSec.style.backgroundImage = `url(${this._tex.inset})`;
+    const waveHead = this._el('div', null, waveSec, 'cons-wave-head');
+    this._el('div', null, waveHead, 'cons-hdr-label').textContent = 'WAVE';
+    this.waveEl = this._el('div', 'wave', waveHead, 'cons-wave-num');
+    this.zoneEl = this._el('div', 'zone', waveHead);
+    const waveStat = this._el('div', null, waveSec, 'cons-wave-stat');
+    const wpLabel = this._el('div', null, waveStat, 'wave-prog-label');
+    wpLabel.innerHTML = 'CLEARED <span id="wave-cleared">0</span> / <span id="wave-quota">0</span>';
+    const wpBar = this._el('div', null, waveStat, 'wave-prog-bar');
+    this.waveProgFill = this._el('div', null, wpBar, 'wave-prog-fill');
+    this.waveClearedEl = wpLabel.querySelector('#wave-cleared');
+    this.waveQuotaEl = wpLabel.querySelector('#wave-quota');
+    this.respiteEl = this._el('div', 'respite', waveSec);
+    // -- CONFIRMED KILLS section --
+    const killSec = this._el('div', 'cons-kills', header);
+    killSec.style.backgroundImage = `url(${this._tex.inset})`;
+    this._el('div', null, killSec, 'cons-hdr-label').textContent = 'CONFIRMED KILLS';
+    const killRow = this._el('div', null, killSec, 'kills-row');
+    this.killsEl = this._el('div', 'kills', killRow, 'kills-odo');
+    this.killGoalEl = this._el('div', 'kill-goal', killRow);
+    this.killGoalEl.textContent = '/ ' + WIN_KILLS.toLocaleString('en-US');
+    const prog = this._el('div', 'progress', killSec);
+    this.progFill = this._el('div', 'progress-fill', prog);
+
+    // === BODY ROW: the instrument cluster ===
+    const body = this._el('div', 'cons-body', bar);
+
     // --- message log (green CRT) ---
-    const logWrap = this._el('div', 'cons-log-wrap', bar);
+    const logWrap = this._el('div', 'cons-log-wrap', body);
     logWrap.style.backgroundImage = `url(${this._tex.inset})`;
     this.logEl = this._el('div', 'cons-log', logWrap);
 
     // --- HP + AMMO odometer meters ---
-    const meters = this._el('div', 'cons-meters', bar);
+    const meters = this._el('div', 'cons-meters', body);
     const hpBox = this._el('div', null, meters, 'cons-meter');
     this._el('div', null, hpBox, 'cons-meter-label').textContent = 'HP';
     this.hpOdo = this._el('div', null, hpBox, 'odometer');
@@ -139,30 +143,30 @@ export class HUD {
     this._el('div', null, resCol, 'cons-ammo-sub').textContent = 'RESERVE';
 
     // --- alarm lamp + MAP lamp ---
-    const lamps = this._el('div', 'cons-lamps', bar);
+    const lamps = this._el('div', 'cons-lamps', body);
     this.alarmLamp = this._el('div', null, lamps, 'cons-lamp alarm');
     this.mapLamp = this._el('div', null, lamps, 'cons-lamp map');
     this.mapLamp.textContent = 'MAP';
 
     // --- centre portrait monitor ---
-    const mon = this._el('div', 'cons-monitor', bar);
+    const mon = this._el('div', 'cons-monitor', body);
     this._el('div', null, mon, 'cons-mon-cable');
     const screen = this._el('div', null, mon, 'cons-mon-screen');
     this.portraitCanvas = document.createElement('canvas');
-    this.portraitCanvas.width = 116; this.portraitCanvas.height = 132;
+    this.portraitCanvas.width = 98; this.portraitCanvas.height = 108;
     this.portraitCanvas.className = 'cons-portrait';
     screen.appendChild(this.portraitCanvas);
     this.portrait = new Portrait(this.portraitCanvas);
 
     // --- AIM indicator ---
-    const aim = this._el('div', 'cons-aim', bar);
+    const aim = this._el('div', 'cons-aim', body);
     this._el('div', null, aim, 'cons-aim-label').textContent = 'AIM';
     this.aimLamp = this._el('div', null, aim, 'cons-aim-lamp');
     this.aimState = this._el('div', null, aim, 'cons-aim-state');
     this.aimState.textContent = 'OFF';
 
     // --- WEAPON panel ---
-    const wp = this._el('div', 'cons-weapon', bar);
+    const wp = this._el('div', 'cons-weapon', body);
     this._el('div', null, wp, 'cons-panel-label').textContent = 'WEAPON';
     const wpScreen = this._el('div', null, wp, 'cons-weapon-screen');
     wpScreen.style.backgroundImage = `url(${this._tex.inset})`;
@@ -173,7 +177,7 @@ export class HUD {
     this.weaponMode = this._el('div', null, wp, 'cons-weapon-mode');
 
     // --- ARMS panel (6-slot armoury grid) ---
-    const arms = this._el('div', 'cons-arms', bar);
+    const arms = this._el('div', 'cons-arms', body);
     this._el('div', null, arms, 'cons-panel-label').textContent = 'ARMS';
     this.armsGrid = this._el('div', null, arms, 'cons-arms-grid');
     this.armsSlots = []; // filled on first update

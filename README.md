@@ -153,12 +153,14 @@ There is deliberately no command that touches the kill counter — the
   panel (live silhouette + fire mode), and a six-slot ARMS armoury grid with
   per-weapon reserves. The portrait is driven by health — a well-spaced
   forward/left/right **look-around idle above 50% HP**, a stern face at ≤50%,
-  a drained face at ≤25% (the CRT tints green → amber → red to match). Above
-  it sit matching **themed gauge panels**: a **WAVE** readout with the zone and
-  a live wave-progress counter (kills banked toward the wave's quota), and a
-  **CONFIRMED KILLS** counter toward 250,000 with its victory progress bar. Run
-  stats — accuracy, score, secrets, progress, time — live on the **pause screen
-  as circular gauges**, not on the HUD.
+  a drained face at ≤25% (the CRT tints green → amber → red to match). A
+  **header strip** across the top of the console carries the campaign readouts
+  on their own green CRT screens: a **WAVE** readout with the zone and a live
+  wave-progress counter (kills banked toward the wave's quota), and a
+  **CONFIRMED KILLS** counter toward 250,000 with its victory progress bar —
+  everything lives in the one bottom console, nothing floats at the top of the
+  screen. Run stats — accuracy, score, secrets, progress, time — live on the
+  **pause screen as circular gauges**, not on the HUD.
 - **Waves:** **kill-driven** escalating hordes. Each wave sets a kill quota and
   clears the moment you hit it, so racking up kills is what advances the wave;
   then a short respite with a supply drop before the next, larger wave. Past
