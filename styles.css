@@ -53,44 +53,90 @@ html, body {
   padding: 6px 10px;
 }
 
-/* layout corners */
-#hud-tl { position: absolute; top: 12px; left: 12px; z-index: 20; min-width: 150px; }
-#wave { font-size: 20px; font-weight: bold; color: #e0b840; letter-spacing: 2px; }
-#zone { font-size: 11px; letter-spacing: 1px; margin-top: 2px; }
-#respite { font-size: 11px; color: #8fa3c0; }
-
-#hud-tc {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-  z-index: 20; text-align: center;
+/* themed gauge panels — rusted iron ground, brass frame, brass rivets,
+   matching the console bar. Shared by the WAVE (top-left) and CONFIRMED
+   KILLS (top-centre) readouts. */
+.gauge-panel {
+  position: absolute; top: 12px; z-index: 20;
+  background-color: #34312f; background-size: cover; background-position: center;
+  border: 2px solid #6a5a38; border-radius: 4px;
+  padding: 6px 12px 8px; image-rendering: pixelated;
+  box-shadow: inset 0 2px 0 rgba(0,0,0,0.4), inset 0 0 12px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.5);
 }
-#kills { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
-#progress { margin-top: 4px; height: 12px; padding: 2px; }
-#progress-fill { height: 100%; width: 0; background: #e0b840; min-width: 1px; }
+.gauge-panel > * { image-rendering: auto; }
+.gauge-panel::before, .gauge-panel::after { /* brass corner rivets */
+  content: ''; position: absolute; width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d8b552, #6a5324);
+  top: 4px;
+}
+.gauge-panel::before { left: 4px; }
+.gauge-panel::after { right: 4px; }
+.gauge-title {
+  font-size: 10px; letter-spacing: 4px; color: #b6a068; text-align: center;
+}
 
-#hud-tr { position: absolute; top: 12px; right: 12px; z-index: 20; text-align: right; font-size: 13px; }
-#hud-tr div { margin: 1px 0; }
+#hud-tl { left: 12px; min-width: 190px; }
+.gauge-head { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+#wave {
+  font-size: 26px; font-weight: bold; color: #e8e2c8; letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(224,184,64,0.4);
+}
+#zone { font-size: 11px; letter-spacing: 2px; color: #cfe0c0; text-align: center; margin-top: 1px; }
+.wave-prog { margin-top: 6px; }
+.wave-prog-label { font-size: 9px; letter-spacing: 1px; color: #8fa37a; text-align: center; }
+.wave-prog-label span { color: #7be07b; }
+.wave-prog-bar {
+  margin-top: 3px; height: 8px; padding: 1px;
+  background: #0a0f0a; border: 1px solid #4a4230; box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+}
+.wave-prog-fill { height: 100%; width: 0; background: linear-gradient(#b03030, #d05a4a); transition: width 0.3s; }
+.wave-prog-fill.done { background: linear-gradient(#4a8a3a, #6ac84a); }
+#respite { font-size: 10px; color: #d8b552; letter-spacing: 1px; text-align: center; margin-top: 4px; }
+
+#hud-tc { left: 50%; transform: translateX(-50%); text-align: center; min-width: 240px; }
+.kills-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin-top: 2px; }
+.kills-odo {
+  font-size: 26px; font-weight: bold; letter-spacing: 2px; color: #e8e2c8;
+  text-shadow: 0 0 6px rgba(224,184,64,0.4);
+}
+#kill-goal { font-size: 12px; color: #8a9478; letter-spacing: 1px; }
+#progress {
+  margin-top: 5px; height: 10px; padding: 1px;
+  background: #0a0f0a; border: 1px solid #4a4230; box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+}
+#progress-fill { height: 100%; width: 0; background: linear-gradient(#c8a03a, #e0b840); min-width: 1px; }
 
 /* ===================================================================
    CONSOLE BAR — full-width bottom Fallout-style instrument panel.
    Rusted riveted iron ground, brass trim, green CRT insets.
    =================================================================== */
 #console-bar {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 132px;
-  z-index: 21; display: flex; align-items: stretch; gap: 6px;
-  padding: 8px 10px 8px 10px;
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 10px;
+  width: min(1180px, calc(100% - 24px)); height: 132px;
+  z-index: 21; display: flex; align-items: stretch; justify-content: center; gap: 6px;
+  padding: 8px 12px;
   background-color: #34312f; background-size: cover; background-position: center;
-  border-top: 3px solid #6a5a38;
-  box-shadow: inset 0 3px 0 rgba(0,0,0,0.5), inset 0 -3px 12px rgba(0,0,0,0.6);
+  border: 3px solid #6a5a38; border-radius: 8px;
+  box-shadow:
+    inset 0 3px 0 rgba(0,0,0,0.5), inset 0 -3px 12px rgba(0,0,0,0.6),
+    0 4px 14px rgba(0,0,0,0.6);
   image-rendering: pixelated;
 }
 #console-bar > div { image-rendering: auto; }
+/* brass rivets in the four corners of the mounted console */
+#console-bar::before, #console-bar::after {
+  content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d8b552, #6a5324); bottom: 6px;
+}
+#console-bar::before { left: 8px; }
+#console-bar::after { right: 8px; }
 
 /* condition tab (top-left corner) */
 #cons-cond {
-  position: absolute; top: -3px; left: 14px;
+  position: absolute; top: -14px; left: 14px;
   font-size: 10px; letter-spacing: 3px; color: #cfe0c0;
-  background: #1a1c16; border: 2px solid #6a5a38; border-top: none;
-  padding: 2px 12px 3px;
+  background: #1a1c16; border: 2px solid #6a5a38; border-bottom: none;
+  border-radius: 4px 4px 0 0; padding: 2px 12px 3px;
 }
 #cons-cond.warn { color: #e6c24a; border-color: #7a6a2a; }
 #cons-cond.crit { color: #e05a44; border-color: #7a2a20; }
@@ -123,7 +169,7 @@ html, body {
 .log-line.warn { color: #e08a4a; text-shadow: 0 0 4px rgba(224,120,60,0.5); }
 
 /* HP + AMMO odometer meters */
-#cons-meters { display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 2px; }
+#cons-meters { display: flex; flex-direction: column; justify-content: center; gap: 7px; padding: 0 4px; }
 .cons-meter { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .cons-meter-label { font-size: 10px; letter-spacing: 3px; color: #b6a068; }
 .odometer {
@@ -140,6 +186,17 @@ html, body {
 .odometer.low .digit { color: #e6c24a; }
 .odometer.crit .digit, .odometer.empty .digit { color: #e05a44; }
 .digit.inf, .digit.melee { color: #9fb890; width: 46px; font-size: 22px; }
+
+/* AMMO split into LOADED (in the gun) + RESERVE (carried) */
+.cons-ammo-row { display: flex; gap: 6px; align-items: flex-start; }
+.cons-ammo-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cons-ammo-sub { font-size: 8px; letter-spacing: 1px; color: #8a9478; }
+.odometer.small { padding: 2px; gap: 1px; }
+.odometer.small .digit {
+  width: 16px; height: 22px; line-height: 22px; font-size: 17px;
+}
+.odometer.small .digit.inf, .odometer.small .digit.melee { width: 34px; font-size: 16px; }
+.cons-ammo-col .odometer.empty .digit { color: #e05a44; }
 
 /* alarm + map lamps */
 #cons-lamps { display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 2px; }
@@ -221,7 +278,7 @@ html, body {
    fades in (0.15s) and auto-hides after inactivity (0.2s out). The 3D
    weapon itself is drawn in-engine by WeaponView, not here. */
 #weapon-menu {
-  position: absolute; top: 62px; left: 50%;
+  position: absolute; top: 104px; left: 50%;
   transform: translateX(-50%) translateY(-8px);
   z-index: 22; display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 8px 10px 9px;

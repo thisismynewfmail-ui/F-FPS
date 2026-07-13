@@ -144,18 +144,21 @@ There is deliberately no command that touches the kill counter — the
 - **Inventory (Tab):** a themed satchel for quest items such as keys. Opening
   frees the mouse for the UI and freezes the world; Tab (or Esc) closes it and
   hands the mouse straight back to the game.
-- **HUD & stats:** a full-width **Fallout-style console bar** across the bottom
-  — a rusted, riveted cast-iron panel (procedurally textured) carrying a
-  CLEAN/HURT/CRITICAL condition tab, a green CRT message log, mechanical HP and
-  AMMO odometers, a damage alarm lamp and a MAP lamp, a centre **player
-  portrait** on a green CRT monitor, an AIM ON/OFF indicator (lit while
-  scoped), a WEAPON panel (live silhouette + fire mode), and a six-slot ARMS
-  armoury grid with per-weapon reserves. The portrait is driven by health —
-  a well-spaced forward/left/right **look-around idle above 50% HP**, a stern
-  face at ≤50%, a drained face at ≤25% (the CRT tints green → amber → red to
-  match). The 250,000 kill counter and victory progress stay top-centre;
-  wave/zone top-left. Run stats — accuracy, score, secrets, progress, time —
-  live on the **pause screen as circular gauges**, not on the HUD.
+- **HUD & stats:** a centred **Fallout-style console bar** — a mounted,
+  brass-framed, riveted cast-iron panel (procedurally textured) carrying a
+  CLEAN/HURT/CRITICAL condition tab, a green CRT message log, a mechanical HP
+  odometer, **two separate ammo odometers — LOADED (in the gun) and RESERVE
+  (carried)**, a damage alarm lamp and a MAP lamp, a centre **player portrait**
+  on a green CRT monitor, an AIM ON/OFF indicator (lit while scoped), a WEAPON
+  panel (live silhouette + fire mode), and a six-slot ARMS armoury grid with
+  per-weapon reserves. The portrait is driven by health — a well-spaced
+  forward/left/right **look-around idle above 50% HP**, a stern face at ≤50%,
+  a drained face at ≤25% (the CRT tints green → amber → red to match). Above
+  it sit matching **themed gauge panels**: a **WAVE** readout with the zone and
+  a live wave-progress counter (kills banked toward the wave's quota), and a
+  **CONFIRMED KILLS** counter toward 250,000 with its victory progress bar. Run
+  stats — accuracy, score, secrets, progress, time — live on the **pause screen
+  as circular gauges**, not on the HUD.
 - **Waves:** **kill-driven** escalating hordes. Each wave sets a kill quota and
   clears the moment you hit it, so racking up kills is what advances the wave;
   then a short respite with a supply drop before the next, larger wave. Past

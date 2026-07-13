@@ -55,16 +55,33 @@ export class HUD {
     this._el('div', 'healflash');
     this._el('div', 'crosshair').innerHTML = '<span></span>';
 
-    // top-left: wave + zone
-    const tl = this._el('div', 'hud-tl', null, 'panel');
-    this.waveEl = this._el('div', 'wave', tl);
+    // top-left: WAVE gauge + zone + wave-progress counter (themed to match
+    // the console: rusted-iron ground, brass frame, green CRT readouts)
+    const tl = this._el('div', 'hud-tl', null, 'gauge-panel');
+    tl.style.backgroundImage = `url(${this._tex.bar})`;
+    const waveHead = this._el('div', null, tl, 'gauge-head');
+    this._el('div', null, waveHead, 'gauge-title').textContent = 'WAVE';
+    this.waveEl = this._el('div', 'wave', waveHead, 'gauge-num');
     this.zoneEl = this._el('div', 'zone', tl);
+    // wave-stats: kills banked toward the current wave's quota
+    const wp = this._el('div', 'wave-prog', tl);
+    const wpLabel = this._el('div', null, wp, 'wave-prog-label');
+    wpLabel.innerHTML = 'CLEARED <span id="wave-cleared">0</span> / <span id="wave-quota">0</span>';
+    const wpBar = this._el('div', null, wp, 'wave-prog-bar');
+    this.waveProgFill = this._el('div', null, wpBar, 'wave-prog-fill');
+    this.waveClearedEl = wpLabel.querySelector('#wave-cleared');
+    this.waveQuotaEl = wpLabel.querySelector('#wave-quota');
     this.respiteEl = this._el('div', 'respite', tl);
 
-    // top-center: kill counter + progress
-    const tc = this._el('div', 'hud-tc');
-    this.killsEl = this._el('div', 'kills', tc, 'panel');
-    const prog = this._el('div', 'progress', tc, 'panel');
+    // top-center: confirmed-kills counter toward 250,000 (themed gauge)
+    const tc = this._el('div', 'hud-tc', null, 'gauge-panel');
+    tc.style.backgroundImage = `url(${this._tex.bar})`;
+    this._el('div', null, tc, 'gauge-title').textContent = 'CONFIRMED KILLS';
+    const killRow = this._el('div', null, tc, 'kills-row');
+    this.killsEl = this._el('div', 'kills', killRow, 'kills-odo');
+    this.killGoalEl = this._el('div', 'kill-goal', killRow);
+    this.killGoalEl.textContent = '/ ' + WIN_KILLS.toLocaleString('en-US');
+    const prog = this._el('div', 'progress', tc);
     this.progFill = this._el('div', 'progress-fill', prog);
 
     this._buildConsole();
@@ -108,10 +125,18 @@ export class HUD {
     this._el('div', null, hpBox, 'cons-meter-label').textContent = 'HP';
     this.hpOdo = this._el('div', null, hpBox, 'odometer');
     this.hpOdo.style.backgroundImage = `url(${this._tex.inset})`;
-    const ammoBox = this._el('div', null, meters, 'cons-meter');
+    // AMMO split into two meters: LOADED (in the gun) and RESERVE (carried)
+    const ammoBox = this._el('div', null, meters, 'cons-meter cons-ammo');
     this._el('div', null, ammoBox, 'cons-meter-label').textContent = 'AMMO';
-    this.ammoOdo = this._el('div', null, ammoBox, 'odometer');
+    const ammoRow = this._el('div', null, ammoBox, 'cons-ammo-row');
+    const loadedCol = this._el('div', null, ammoRow, 'cons-ammo-col');
+    this.ammoOdo = this._el('div', null, loadedCol, 'odometer small');
     this.ammoOdo.style.backgroundImage = `url(${this._tex.inset})`;
+    this._el('div', null, loadedCol, 'cons-ammo-sub').textContent = 'LOADED';
+    const resCol = this._el('div', null, ammoRow, 'cons-ammo-col');
+    this.resOdo = this._el('div', null, resCol, 'odometer small');
+    this.resOdo.style.backgroundImage = `url(${this._tex.inset})`;
+    this._el('div', null, resCol, 'cons-ammo-sub').textContent = 'RESERVE';
 
     // --- alarm lamp + MAP lamp ---
     const lamps = this._el('div', 'cons-lamps', bar);
@@ -393,13 +418,19 @@ export class HUD {
     this.portrait.setHealth(hpFrac);
     this.portrait.update(dt);
 
-    // --- console: AMMO odometer ---
+    // --- console: AMMO odometers — LOADED (in gun) + RESERVE (carried) ---
     if (cur.mag === Infinity) {
-      this.ammoOdo.innerHTML = '<span class="digit melee">—</span>';
-      this.ammoOdo._last = 'melee';
+      this.ammoOdo.innerHTML = '<span class="digit melee">—</span>'; this.ammoOdo._last = 'melee';
+      this.resOdo.innerHTML = '<span class="digit melee">—</span>'; this.resOdo._last = 'melee';
     } else {
       this._odometer(this.ammoOdo, cur.mag);
       this.ammoOdo.classList.toggle('empty', cur.mag === 0 && !cur.reloading);
+      if (cur.reserve === Infinity) {
+        this.resOdo.innerHTML = '<span class="digit inf">&#8734;</span>'; this.resOdo._last = 'inf';
+      } else {
+        this._odometer(this.resOdo, cur.reserve);
+      }
+      this.resOdo.classList.toggle('empty', cur.reserve === 0 && cur.mag === 0);
     }
 
     // --- console: alarm lamp + AIM indicator ---
@@ -445,14 +476,23 @@ export class HUD {
       s.rsv.textContent = `${mag}·${rsv}`;
     });
 
-    // --- kills + progress (top-center) ---
-    this.killsEl.textContent = `KILLS: ${d.kills.toLocaleString('en-US')} / ${WIN_KILLS.toLocaleString('en-US')}`;
+    // --- confirmed-kills counter + victory progress (top-center) ---
+    this.killsEl.textContent = d.kills.toLocaleString('en-US');
     this.progFill.style.width = (Math.min(1, d.kills / WIN_KILLS) * 100).toFixed(3) + '%';
 
-    // --- wave / zone ---
-    this.waveEl.textContent = d.wave.state === 'active' ? 'WAVE ' + d.wave.n : d.wave.n === 0 ? 'THEY ARE COMING' : 'RESPITE';
-    this.respiteEl.textContent = d.wave.state === 'respite' ? 'next wave in ' + Math.ceil(d.wave.respiteLeft) + 's' : '';
+    // --- WAVE gauge + zone + wave-progress (top-left) ---
+    this.waveEl.textContent = d.wave.n === 0 ? '—' : d.wave.n;
     this.zoneEl.textContent = d.zoneName.toUpperCase();
+    const active = d.wave.state === 'active';
+    const quota = d.wave.quota || 0;
+    const cleared = Math.min(d.wave.killsThisWave || 0, quota);
+    this.waveClearedEl.textContent = active ? cleared : d.wave.n === 0 ? 0 : quota;
+    this.waveQuotaEl.textContent = quota;
+    this.waveProgFill.style.width = (active && quota ? Math.min(1, cleared / quota) * 100 : d.wave.state === 'respite' ? 100 : 0).toFixed(1) + '%';
+    this.waveProgFill.classList.toggle('done', !active);
+    this.respiteEl.textContent = d.wave.state === 'respite'
+      ? (d.wave.n === 0 ? 'THEY ARE COMING · ' : 'RESPITE · ') + Math.ceil(d.wave.respiteLeft) + 's'
+      : 'HOLD THE LINE';
 
     // --- fly-in ARMORY names (built once) ---
     if (!this.slotEls.length) {

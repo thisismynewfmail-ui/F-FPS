@@ -246,7 +246,10 @@ export class Game {
       kills: this.score.kills,
       points: this.score.points,
       accuracy: this.score.accuracy,
-      wave: { n: this.waves.wave, state: this.waves.state, respiteLeft: this.waves.respiteLeft },
+      wave: {
+        n: this.waves.wave, state: this.waves.state, respiteLeft: this.waves.respiteLeft,
+        quota: this.waves.quota, killsThisWave: this.waves.killsThisWave,
+      },
       zoneName: this.world.zones.zoneAt(this.player.position.x, this.player.position.z).name,
       secrets: { found: this.world.secrets.found.size, total: this.world.secrets.total },
       prompt: this._prompt,
